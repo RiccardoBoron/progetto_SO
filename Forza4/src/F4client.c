@@ -18,12 +18,9 @@
 //Dimensione massima delle righe e colonne della Matrice
 #define MAXR 50
 #define MAXC 50
-
-//Costanti per il gioco
 #define g1 'X' //Carattere del giocatore 1
 #define g2 'O' //Carattere del giocatore 2
-#define vuoto ' '  //Carattere per uno spazio vuoto
-#define CVitt  'V'   
+#define vuoto ' '  //Carattere per uno spazio vuoto  
 #define vuotoI 0
 #define g1I 1
 #define g2I 2
@@ -35,6 +32,7 @@ void stampaRigaPiena(int c);
 char stampaCasella(int);
 int isValidInput(const char*, int); 
 int inserisci(int m[MAXR][MAXC], int, int);
+
 
 //------------------------- FUNZIONE PER LA CREAZIONE DI UN SET DI SEMAFORI -------------------------//
 int create_sem_set(key_t semkey) {
@@ -64,19 +62,18 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    //Creazione delle chiavi dei samafori e della memoria condivisa (uguali al server)
-    key_t shmKey = 12;
-    key_t semKey = 23;
+    //Creazione delle chiavi dei samafori e della memoria condivisa e dalla message queue(uguali al server)
+    key_t shmKey = 12; //Memoria condivisa
+    key_t semKey = 23; //Semafori
     key_t msgKey = 10; //Coda dei messaggi
 
-    //Buffer per salvare la colonna da inserire
+    //Buffer nel quale salvo la posizione che chiedo al client per inserire il gettone
     char buffer[3];
 
     //------------------------- CREAZIONE SET DI SEMAFORI -------------------------//
     int semid = create_sem_set(semKey);
 
     //------------------------- ATTESA SECONDO GIOCATORE -------------------------//
-
     //Avviso il server che il client é arrivato
     semOp(semid, 0, 1);
 
@@ -98,7 +95,7 @@ int main(int argc, char *argv[]) {
         errExit("msgget failed\n");
     }
 
-    //Struttura condivisa con coda dei messaggi
+    //Struttura condivisa con coda dei messaggi, serve al server per inserire il gettone nella posizione giusta
     struct myMsg{
         int mtype;
         int posRiga;
@@ -112,46 +109,65 @@ int main(int argc, char *argv[]) {
 
 
     //------------------------- GESTIONE DEL GIOCO -------------------------//
-    while(1){
+    int fine = 1; 
+    while(fine == 1){
         semOp(semid, 2, -1);
-        stampa(request->matrix, request->rows, request->colums);
-            
-        printf("\nGiocatore %s inserisci la colonna:  ", argv[1]);
-        fgets(buffer, sizeof(buffer), stdin);
-
-        //Inserimento della colonna nella sruttura e invio al server
-        int colonna = isValidInput(buffer, request->colums); //Verifico che sia un input valido
-        int rigaValida = inserisci(request->matrix, request->rows, colonna); //Acquisisco la riga dove inserirla
-        if(rigaValida != -1){
-            //Invio al server dove deve mettere il gettone
-            mossa.posRiga = rigaValida;
-            mossa.posColonna = colonna;
-            if(msgsnd(msqid, &mossa, siz, 0) == -1){
-                errExit("msgsnd failed\n");
-            }
-            //request->inserimentoRiga = rigaValida;
-            //request->inserimentoColonna = colonna;
-        }else {
-            printf("\nLa colonna é piena!! Inseriscine una diversa!\n");
+        //Se nessuno ha ancora vinto o pareggiato continuo
+        if(request->vincitore == 1 || request->vincitore == 2){
+            printf("\n Hai perso!!\n");
+            break;
         }
+        stampa(request->matrix, request->rows, request->colums);
+        
+        //Inserimento della colonna nella sruttura e invio al server
+        int colonna = 0;
+        do{
+            //Chiedo al giocatore di inserire la colonna dove vuole far cadere il gettone   
+            printf("\nGiocatore %s inserisci la colonna:  ", argv[1]);
+            fgets(buffer, sizeof(buffer), stdin);
+            colonna = isValidInput(buffer, request->colums); //Verifico che sia un input valido
+            if(colonna == -1){
+                printf("\nInvalid column input\n");
+            }
+        }while(colonna == -1); //Continuo a chiedere la colonna fintanto che mi da un input valido
+
+        int rigaValida = inserisci(request->matrix, request->rows, colonna); //Acquisisco la riga dove inserirla
+        int ok = 1;
+        do{
+            if(rigaValida != -1){
+                //Invio al server dove deve mettere il gettone
+                mossa.posRiga = rigaValida;
+                mossa.posColonna = colonna;
+                if(msgsnd(msqid, &mossa, siz, 0) == -1){
+                    errExit("msgsnd failed\n");
+                }
+                ok = 0;
+            }else {
+                //Se la colonna è piana ne chiedo una nuova
+                printf("\nLa colonna é piena!! Inseriscine una diversa!\n");
+                printf("\nGiocatore %s inserisci la colonna:  ", argv[1]);
+                fgets(buffer, sizeof(buffer), stdin);
+                colonna = isValidInput(buffer, request->colums);
+                rigaValida = inserisci(request->matrix, request->rows, colonna);
+            }
+        }while(ok == 1);
         
         semOp(semid, 1, -1);
         stampa(request->matrix, request->rows, request->colums);
-
+        //Controllo se ce stata una vincita
         if(request->vincitore == 1){
             printf("\nHai Vinto !!!\n");
-            break;
+            //break;
+            fine = 0;
         }
+        //Controllo se ce stato un pareggio
         if(request->vincitore == 2){
             printf("\nPareggio\n");
-            break;
+            //break;
+            fine = 0;
         }
     }
-    semOp(semid, 0, 1);
-
-
-
-
+    semOp(semid, 0, 1); //Il server può terminare
 
     //------------------------- ELIMINAZIONE SEMAFORI E SHARED MEMORY -------------------------//
     if(semctl(semid, 0, IPC_RMID, NULL) == -1)
@@ -213,9 +229,6 @@ char stampaCasella(int x){
         case 2:
             c=g2;
             break;
-        case 3:
-            c=CVitt; 
-            break;
     }
     return c;
 }
@@ -228,11 +241,9 @@ int isValidInput(const char *s, int coordinata) {
     if(errno == 0 && *endptr == '\n' && res >= 0 && res < coordinata) {
         return res;
     } else{
-        printf("Invalid input argument\n");
-        exit(1);
+        return -1;
     }
 }
-
 
 // Convalida la colonna, se é libera, nel caso restituisce la casella piu bassa libera
 int inserisci(int m[MAXR][MAXC], int r, int c){

@@ -90,14 +90,14 @@ int main(int argc, char *argv[]) {
     int semid = create_sem_set(semKey);
 
     //------------------------- IL SERVER ASPETTA I CLIENT -------------------------//
-    printf("<Servre> aspetto i client\n");
+    printf("\n<Servre> aspetto i client\n");
     semOp(semid, 0, -1); //Attesa primo client
-    printf("<Server> Client 1 arrivato, attendo Client 2\n");
+    printf("\n<Server> Client 1 arrivato, attendo Client 2\n");
     semOp(semid, 0, -1); //Attesa secondo client
-    printf("<Server> Client 2 arrivato\n");
+    printf("\n<Server> Client 2 arrivato\n");
 
    //------------------------- INIZIALIZZAZIONE CAMPO DI GIOCO -------------------------//
-    printf("<Server> Azzero il campo di gioco e lo inserisco nella struttura\n");
+    printf("\n<Server> Azzero il campo di gioco e lo inserisco nella struttura\n");
     //Inserimento delle righe e colonne nella matrice della struttura request
     request->rows = rows;
     request->colums = colums;
@@ -130,14 +130,14 @@ int main(int argc, char *argv[]) {
 
     
     //------------------------- GESTIONE DEL GIOCO -------------------------//
-    int nt = 0, turn = 3;
-    while(1){
+    int nt = 0, turn = 1, fine = 1;
+    while(fine == 1){
         //Ricevo la mossa dal client 
         if(msgrcv(msqid, &mossa, siz, 0, 0) == -1){
             errExit("msgrcv failed\n");
         }
         nt ++; //Incremento il numero di mosse totali
-        if(turn == 3){
+        if(turn == 1){
             turn ++; 
             request->matrix[mossa.posRiga][mossa.posColonna] = g1I; //Inserimento gettone nella matrice
         } else {
@@ -152,10 +152,10 @@ int main(int argc, char *argv[]) {
         /* CONTROLLO SE QUALCUNO HA VINTO */
         //Controllo verticale
         for(int i = 0; i < request->rows - 1; i++){
-            if(turn == 4 && request->matrix[i][mossa.posColonna] == g1I && request->matrix[i+1][mossa.posColonna] == g1I){
+            if(turn == 2 && request->matrix[i][mossa.posColonna] == g1I && request->matrix[i+1][mossa.posColonna] == g1I){
                 verticale1 ++;
             }
-            if(turn == 3 && request->matrix[i][mossa.posColonna] == g2I && request->matrix[i+1][mossa.posColonna] == g2I){
+            if(turn == 1 && request->matrix[i][mossa.posColonna] == g2I && request->matrix[i+1][mossa.posColonna] == g2I){
                 verticale2 ++;
             }
         }
@@ -163,24 +163,26 @@ int main(int argc, char *argv[]) {
         //Controllo orizzontale
         for(int i = 0; i < request->rows; i++){
             for(int j = 0; j < request->colums; j++){
-                if(turn == 4 && request->matrix[i][j] == g1I && request->matrix[i][j+1] == g1I){
+                if(turn == 2 && request->matrix[i][j] == g1I && request->matrix[i][j+1] == g1I){
                     orizzontale1 ++;
                 }
-                if(turn == 3 && request->matrix[i][j] == g2I && request->matrix[i][j+1] == g2I){
+                if(turn == 1 && request->matrix[i][j] == g2I && request->matrix[i][j+1] == g2I){
                     orizzontale1 ++;
                 }
             }
         }
 
         //Comunico la vittoria
-        if(verticale1 == 2 || verticale2 == 2 || orizzontale1 == 2 || orizzontale2 == 2){
+        if(verticale1 == 3 || verticale2 == 3 || orizzontale1 == 3 || orizzontale2 == 3){
             request->vincitore = 1;
-            break;
+            //break;
+            fine = 0;
         }
         //Comunico il pareggio
         if(nt == request->rows * request->colums && request->vincitore == 0){
             request->vincitore = 2;
-            break;
+            //break;
+            fine = 0;
         }
         
         //Avviso il client che puó stampare
@@ -189,11 +191,10 @@ int main(int argc, char *argv[]) {
     } 
     
 
-
     //Aspetto la terminazione dei client per eliminare semafori e shared memeory
-    printf("<Server> is waiting for a <Client> ending...\n"); 
+    printf("<Server> aspetto che i client terminino\n"); 
     semOp(semid, 0, -1); 
-    printf("1st <Client> ended, now <Server> is waiting for the 2nd. \n"); 
+    printf("Client 1 terminato, aspetto per Client 2 \n"); 
     semOp(semid, 0, -1);
 
     //------------------------- ELIMINAZIONE SEMAFORI E SHARED MEMORY -------------------------//
