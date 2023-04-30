@@ -14,15 +14,12 @@
 #include "shared_memory.h"
 
 //------------------------- COSTANTI -------------------------//
-
 //Dimensione massima delle righe e colonne della Matrice
 #define MAXR 50
 #define MAXC 50
 
-
 //------------------------- PROTOTIPI DI FUNZIONI -------------------------//
 void azzera(char m[MAXR][MAXC], int, int); //Inizializza la matrice
-
 
 
 //------------------------- FUNZIONE PER LA CREAZIONE DI UN SET DI SEMAFORI -------------------------//
@@ -45,8 +42,6 @@ int create_sem_set(key_t semkey) {
 
 int msqid = -1; //Inizializzazione msqid
 
-
-
 int main(int argc, char *argv[]) {
 
     //Creazione delle chiavi dei samafori e della memoria condivisa
@@ -65,7 +60,7 @@ int main(int argc, char *argv[]) {
     int rows = atoi(argv[1]);
     int colums = atoi(argv[2]);
     if(rows < 5 || colums < 5) {
-        printf("Errore, the matrix must be min 5x5");
+        printf("\nErrore, il campo di gioco deve essere almeno 5x5\n");
         exit(1);
     }
 
@@ -84,14 +79,14 @@ int main(int argc, char *argv[]) {
     int semid = create_sem_set(semKey);
 
     //------------------------- IL SERVER ASPETTA I CLIENT -------------------------//
-    printf("\n<Servre> aspetto i client\n");
+    printf("\n<Servre> Aspetto i client\n");
     semOp(semid, 0, -1); //Attesa primo client
     printf("\n<Server> Client 1 arrivato, attendo Client 2\n");
     semOp(semid, 0, -1); //Attesa secondo client
     printf("\n<Server> Client 2 arrivato\n");
 
    //------------------------- INIZIALIZZAZIONE CAMPO DI GIOCO -------------------------//
-    printf("\n<Server> Azzero il campo di gioco e lo inserisco nella struttura\n");
+    printf("\n<Server> Preparo il campo di gioco\n");
     //Inserimento delle righe e colonne nella matrice della struttura request
     request->rows = rows;
     request->colums = colums;
@@ -172,13 +167,11 @@ int main(int argc, char *argv[]) {
         //Comunico la vittoria
         if(verticale1 == 3 || verticale2 == 3 || orizzontale1 == 3 || orizzontale2 == 3){
             request->vincitore = 1;
-            //break;
             fine = 0;
         }
         //Comunico il pareggio
         if(nt == request->rows * request->colums && request->vincitore == 0){
             request->vincitore = 2;
-            //break;
             fine = 0;
         }
         

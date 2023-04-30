@@ -25,6 +25,7 @@ void stampa(char m[MAXR][MAXC], int, int);
 void stampaRigaPiena(int c);
 int isValidInput(const char*, int); 
 int inserisci(char m[MAXR][MAXC], int, int);
+void quit(int sig);
 
 
 //------------------------- FUNZIONE PER LA CREAZIONE DI UN SET DI SEMAFORI -------------------------//
@@ -77,12 +78,10 @@ int main(int argc, char *argv[]) {
     semOp(semid, 1, -1);
 
     //------------------------- CREAZIONE MEMEORIA CONDIVISA -------------------------//
-    //Acquisisco il segmento di memoria condivisa del server
-    printf("<Client> getting the server's shared memory segment...\n");
+    //Acquisisco il segmento di memoria condivisa
     int shmid = alloc_shared_memory(shmKey, sizeof(struct Request));
 
     //Attacco il segmento di memoria condivisa
-    printf("<Client> attaching the server's shared memeory segment...\n");
     struct Request *request = (struct Request *)get_shared_memory(shmid, 0);
 
     //------------------------- CREAZIONE CODA DEI MESSAGGI -------------------------//
@@ -107,6 +106,10 @@ int main(int argc, char *argv[]) {
     Gettone1 = request->Gettone1;
     Gettone2 = request->Gettone2;
 
+    //------------------------- GESTIONE DEI SEGNALI ------------------------//
+    if(signal(SIGALRM, quit) == SIG_ERR)
+        errExit("change signal handler failed");
+
 
     //------------------------- GESTIONE DEL GIOCO -------------------------//
     int fine = 1; 
@@ -126,12 +129,14 @@ int main(int argc, char *argv[]) {
         //Inserimento della colonna nella sruttura e invio al server
         int colonna = 0;
         do{
+            alarm(10); //Setto un timeer di 30 secondi 
             //Chiedo al giocatore di inserire la colonna dove vuole far cadere il gettone   
             printf("\nGiocatore %s inserisci la colonna:  ", argv[1]);
             fgets(buffer, sizeof(buffer), stdin);
+            alarm(0); //Disattivo il timer
             colonna = isValidInput(buffer, request->colums); //Verifico che sia un input valido
             if(colonna == -1){
-                printf("\nInvalid column input\n");
+                printf("\nLa colonna non é valida\n");
             }
         }while(colonna == -1); //Continuo a chiedere la colonna fintanto che mi da un input valido
 
@@ -148,7 +153,7 @@ int main(int argc, char *argv[]) {
                 ok = 0;
             }else {
                 //Se la colonna è piana ne chiedo una nuova
-                printf("\nLa colonna é piena!! Inseriscine una diversa!\n");
+                printf("\nLa colonna é piena, inseriscine una diversa!\n");
                 printf("\nGiocatore %s inserisci la colonna:  ", argv[1]);
                 fgets(buffer, sizeof(buffer), stdin);
                 colonna = isValidInput(buffer, request->colums);
@@ -238,3 +243,10 @@ int inserisci(char m[MAXR][MAXC], int r, int c){
           return i;
     return -1;
 }
+
+//Gestione del segnale alarm
+void quit(int sig){
+    printf("\nTempo scaduto!!");
+    exit(1);
+}
+
