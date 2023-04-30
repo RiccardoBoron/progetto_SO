@@ -18,20 +18,13 @@
 //Dimensione massima delle righe e colonne della Matrice
 #define MAXR 50
 #define MAXC 50
-#define g1 'X' //Carattere del giocatore 1
-#define g2 'O' //Carattere del giocatore 2
-#define vuoto ' '  //Carattere per uno spazio vuoto  
-#define vuotoI 0
-#define g1I 1
-#define g2I 2
 
 
 //------------------------- PROTOTIPI DI FUNZIONI -------------------------//
-void stampa(int m[MAXR][MAXC], int, int);
+void stampa(char m[MAXR][MAXC], int, int);
 void stampaRigaPiena(int c);
-char stampaCasella(int);
 int isValidInput(const char*, int); 
-int inserisci(int m[MAXR][MAXC], int, int);
+int inserisci(char m[MAXR][MAXC], int, int);
 
 
 //------------------------- FUNZIONE PER LA CREAZIONE DI UN SET DI SEMAFORI -------------------------//
@@ -52,7 +45,10 @@ int create_sem_set(key_t semkey) {
     return semid;
 }
 
-int msqid = -1; //Inizializzazione msqid 
+int msqid = -1; //Inizializzazione msqid
+//Gettoni dei Giocatori
+char Gettone1;
+char Gettone2;
 
 int main(int argc, char *argv[]) {
 
@@ -107,14 +103,22 @@ int main(int argc, char *argv[]) {
     mossa.posRiga = 0;
     mossa.posColonna = 0;
 
+    //Acquisizione Gettoni giocatori dalla memoria condivisa
+    Gettone1 = request->Gettone1;
+    Gettone2 = request->Gettone2;
+
 
     //------------------------- GESTIONE DEL GIOCO -------------------------//
     int fine = 1; 
     while(fine == 1){
         semOp(semid, 2, -1);
         //Se nessuno ha ancora vinto o pareggiato continuo
-        if(request->vincitore == 1 || request->vincitore == 2){
-            printf("\n Hai perso!!\n");
+        if(request->vincitore == 1){
+            printf("\n Hai perso!!\n"); 
+            break;
+        }
+        if(request->vincitore == 2){
+            printf("\nPareggio!!\n");
             break;
         }
         stampa(request->matrix, request->rows, request->colums);
@@ -157,13 +161,11 @@ int main(int argc, char *argv[]) {
         //Controllo se ce stata una vincita
         if(request->vincitore == 1){
             printf("\nHai Vinto !!!\n");
-            //break;
             fine = 0;
         }
         //Controllo se ce stato un pareggio
         if(request->vincitore == 2){
             printf("\nPareggio\n");
-            //break;
             fine = 0;
         }
     }
@@ -181,7 +183,7 @@ int main(int argc, char *argv[]) {
 
 
 //Funzione che stampa il campo di gioco
-void stampa(int m[MAXR][MAXC], int r, int c) {
+void stampa(char m[MAXR][MAXC], int r, int c) {
     int i,j;
     printf("\n");
     stampaRigaPiena(c);  //Stampo prima riga |---|---|--...
@@ -189,7 +191,7 @@ void stampa(int m[MAXR][MAXC], int r, int c) {
     for(i=0; i<r; i++){ //Stampo le righe centrali
         printf("   |");
         for(j=0; j<c; j++)
-            printf(" %c |",stampaCasella(m[i][j]));
+            printf(" %c |", m[i][j]);
         printf("\n");
         stampaRigaPiena(c);
     }
@@ -216,23 +218,6 @@ void stampaRigaPiena(int c) {
     printf("\n");
 }
 
-//Stampa X o O nella matrice
-char stampaCasella(int x){
-    char c;
-    switch(x){
-        case 0:
-            c=vuoto; 
-            break;
-        case 1:
-            c=g1; 
-            break;
-        case 2:
-            c=g2;
-            break;
-    }
-    return c;
-}
-
 //Controlla se l'input inserito é valido
 int isValidInput(const char *s, int coordinata) {
     char *endptr = NULL;
@@ -246,10 +231,10 @@ int isValidInput(const char *s, int coordinata) {
 }
 
 // Convalida la colonna, se é libera, nel caso restituisce la casella piu bassa libera
-int inserisci(int m[MAXR][MAXC], int r, int c){
+int inserisci(char m[MAXR][MAXC], int r, int c){
     int i;
     for(i=r-1; i>=0; i--)
-        if(m[i][c]==vuotoI)
+        if(m[i][c]==' ')
           return i;
     return -1;
 }

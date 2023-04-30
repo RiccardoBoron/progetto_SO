@@ -19,20 +19,9 @@
 #define MAXR 50
 #define MAXC 50
 
-//Costanti per il gioco
-#define g1 'X' //Carattere del giocatore 1
-#define g2 'O' //Carattere del giocatore 2
-#define vuoto ' '  //Carattere per uno spazio vuoto
-#define vuotoI 0
-#define g1I 1
-#define g2I 2
-
-
-
 
 //------------------------- PROTOTIPI DI FUNZIONI -------------------------//
-void azzera(int m[MAXR][MAXC], int, int); //Inizializza la matrice
-//int controllaF(int m[MAXR][MAXC], const int g, const int r, const int c, const int e); //Controlla se qualcuno ha vinto
+void azzera(char m[MAXR][MAXC], int, int); //Inizializza la matrice
 
 
 
@@ -54,7 +43,8 @@ int create_sem_set(key_t semkey) {
     return semid;
 }
 
-int msqid = -1; //Inizializzazione msqid 
+int msqid = -1; //Inizializzazione msqid
+
 
 
 int main(int argc, char *argv[]) {
@@ -71,13 +61,17 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    //Controll sulle righe e colonne della matrice (area di gioco)
+    //Controllo sulle righe e colonne della matrice (area di gioco)
     int rows = atoi(argv[1]);
     int colums = atoi(argv[2]);
     if(rows < 5 || colums < 5) {
         printf("Errore, the matrix must be min 5x5");
         exit(1);
     }
+
+    //Acquisizione dei due gettoni di gioco 
+    char Gettone1 = *argv[3];
+    char Gettone2 = *argv[4];
 
 
     //Allocazione del segmento di memoria condivisa
@@ -101,6 +95,8 @@ int main(int argc, char *argv[]) {
     //Inserimento delle righe e colonne nella matrice della struttura request
     request->rows = rows;
     request->colums = colums;
+    request->Gettone1 = Gettone1;
+    request->Gettone2 = Gettone2;
     request->vincitore = 0;
     //Inizializzazione della matrice (tutta vuota all'inizio)
     azzera(request->matrix, rows, colums);
@@ -128,6 +124,7 @@ int main(int argc, char *argv[]) {
     semOp(semid, 1, 1); 
     semOp(semid, 1, 1);
 
+
     
     //------------------------- GESTIONE DEL GIOCO -------------------------//
     int nt = 0, turn = 1, fine = 1;
@@ -139,10 +136,10 @@ int main(int argc, char *argv[]) {
         nt ++; //Incremento il numero di mosse totali
         if(turn == 1){
             turn ++; 
-            request->matrix[mossa.posRiga][mossa.posColonna] = g1I; //Inserimento gettone nella matrice
+            request->matrix[mossa.posRiga][mossa.posColonna] = Gettone1; //Inserimento gettone nella matrice
         } else {
             turn --;
-            request->matrix[mossa.posRiga][mossa.posColonna] = g2I; //Inserimento gettone nella matrice
+            request->matrix[mossa.posRiga][mossa.posColonna] = Gettone2; //Inserimento gettone nella matrice
         }
 
         //Variabili per verificare la vittoria
@@ -152,10 +149,10 @@ int main(int argc, char *argv[]) {
         /* CONTROLLO SE QUALCUNO HA VINTO */
         //Controllo verticale
         for(int i = 0; i < request->rows - 1; i++){
-            if(turn == 2 && request->matrix[i][mossa.posColonna] == g1I && request->matrix[i+1][mossa.posColonna] == g1I){
+            if(turn == 2 && request->matrix[i][mossa.posColonna] == Gettone1 && request->matrix[i+1][mossa.posColonna] == Gettone1){
                 verticale1 ++;
             }
-            if(turn == 1 && request->matrix[i][mossa.posColonna] == g2I && request->matrix[i+1][mossa.posColonna] == g2I){
+            if(turn == 1 && request->matrix[i][mossa.posColonna] == Gettone2 && request->matrix[i+1][mossa.posColonna] == Gettone2){
                 verticale2 ++;
             }
         }
@@ -163,10 +160,10 @@ int main(int argc, char *argv[]) {
         //Controllo orizzontale
         for(int i = 0; i < request->rows; i++){
             for(int j = 0; j < request->colums; j++){
-                if(turn == 2 && request->matrix[i][j] == g1I && request->matrix[i][j+1] == g1I){
+                if(turn == 2 && request->matrix[i][j] == Gettone1 && request->matrix[i][j+1] == Gettone1){
                     orizzontale1 ++;
                 }
-                if(turn == 1 && request->matrix[i][j] == g2I && request->matrix[i][j+1] == g2I){
+                if(turn == 1 && request->matrix[i][j] == Gettone2 && request->matrix[i][j+1] == Gettone2){
                     orizzontale1 ++;
                 }
             }
@@ -204,18 +201,19 @@ int main(int argc, char *argv[]) {
     free_shared_memory(request);
     remove_shared_memory(shmid);
 
-
-        
     return 0;
 }
 
 //Inizializza il campo da gioco con tutti 0 ovvero vuoto
-void azzera(int m[MAXR][MAXC], int r, int c){
+void azzera(char m[MAXR][MAXC], int r, int c){
     int i,j;
     for(i=0; i<r; i++)
         for(j=0; j<c; j++)
-          m[i][j]=0;
+          m[i][j]=' ';
 }
+
+
+
 
 
 
