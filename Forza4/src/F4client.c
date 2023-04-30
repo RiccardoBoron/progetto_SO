@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -53,11 +54,20 @@ char Gettone2;
 
 int main(int argc, char *argv[]) {
 
+    int automaticGame = 0; //Variabile per far giocare il pc come avversario
+
     //Controllo input inseriti da linea di comando
     if(argc != 2) {
         printf("Errore input\n");
         exit(1);
     }
+
+    //L'autogiocatore per ora funziona inserendo come nome_utente il valore 1
+    int asterisco = atoi(argv[1]);
+    if(asterisco == 1){
+        automaticGame = 1;
+    }
+
 
     //Creazione delle chiavi dei samafori e della memoria condivisa e dalla message queue(uguali al server)
     key_t shmKey = 12; //Memoria condivisa
@@ -112,6 +122,8 @@ int main(int argc, char *argv[]) {
 
 
     //------------------------- GESTIONE DEL GIOCO -------------------------//
+    srand(time(NULL)); //Per genenare nueri random
+    int maxNum = request->colums; //Numero massimo random da genenrare
     int fine = 1; 
     while(fine == 1){
         semOp(semid, 2, -1);
@@ -128,39 +140,61 @@ int main(int argc, char *argv[]) {
         
         //Inserimento della colonna nella sruttura e invio al server
         int colonna = 0;
-        do{
-            alarm(10); //Setto un timeer di 30 secondi 
-            //Chiedo al giocatore di inserire la colonna dove vuole far cadere il gettone   
-            printf("\nGiocatore %s inserisci la colonna:  ", argv[1]);
-            fgets(buffer, sizeof(buffer), stdin);
-            alarm(0); //Disattivo il timer
-            colonna = isValidInput(buffer, request->colums); //Verifico che sia un input valido
-            if(colonna == -1){
-                printf("\nLa colonna non é valida\n");
-            }
-        }while(colonna == -1); //Continuo a chiedere la colonna fintanto che mi da un input valido
 
-        int rigaValida = inserisci(request->matrix, request->rows, colonna); //Acquisisco la riga dove inserirla
-        int ok = 1;
-        do{
-            if(rigaValida != -1){
-                //Invio al server dove deve mettere il gettone
-                mossa.posRiga = rigaValida;
-                mossa.posColonna = colonna;
-                if(msgsnd(msqid, &mossa, siz, 0) == -1){
-                    errExit("msgsnd failed\n");
+        //Giocatore automatico
+        if(automaticGame == 1){
+            colonna = rand() % (maxNum-0+1)+0;
+            int rigaValida = inserisci(request->matrix, request->rows, colonna);
+            int ok = 1;
+            do{
+                if(rigaValida != -1){
+                    //Invio al server dove deve mettere il gettone
+                    mossa.posRiga = rigaValida;
+                    mossa.posColonna = colonna;
+                    if(msgsnd(msqid, &mossa, siz, 0) == -1){
+                        errExit("msgsnd failed\n");
+                    }
+                    ok = 0;
+                }else {
+                    colonna = rand() % (maxNum-0+1)+0;
+                    rigaValida = inserisci(request->matrix, request->rows, colonna);
                 }
-                ok = 0;
-            }else {
-                //Se la colonna è piana ne chiedo una nuova
-                printf("\nLa colonna é piena, inseriscine una diversa!\n");
+            }while(ok == 1);
+        }else{
+            //Giocatore normale
+            do{
+                alarm(30); //Setto un timeer di 30 secondi 
+                //Chiedo al giocatore di inserire la colonna dove vuole far cadere il gettone   
                 printf("\nGiocatore %s inserisci la colonna:  ", argv[1]);
                 fgets(buffer, sizeof(buffer), stdin);
-                colonna = isValidInput(buffer, request->colums);
-                rigaValida = inserisci(request->matrix, request->rows, colonna);
-            }
-        }while(ok == 1);
-        
+                alarm(0); //Disattivo il timer
+                colonna = isValidInput(buffer, request->colums); //Verifico che sia un input valido
+                if(colonna == -1){
+                    printf("\nLa colonna non é valida\n");
+                }
+            }while(colonna == -1); //Continuo a chiedere la colonna fintanto che mi da un input valido
+
+            int rigaValida = inserisci(request->matrix, request->rows, colonna); //Acquisisco la riga dove inserirla
+            int ok = 1;
+            do{
+                if(rigaValida != -1){
+                    //Invio al server dove deve mettere il gettone
+                    mossa.posRiga = rigaValida;
+                    mossa.posColonna = colonna;
+                    if(msgsnd(msqid, &mossa, siz, 0) == -1){
+                        errExit("msgsnd failed\n");
+                    }
+                    ok = 0;
+                }else {
+                    //Se la colonna è piana ne chiedo una nuova
+                    printf("\nLa colonna é piena, inseriscine una diversa!\n");
+                    printf("\nGiocatore %s inserisci la colonna:  ", argv[1]);
+                    fgets(buffer, sizeof(buffer), stdin);
+                    colonna = isValidInput(buffer, request->colums);
+                    rigaValida = inserisci(request->matrix, request->rows, colonna);
+                }
+            }while(ok == 1);
+        }
         semOp(semid, 1, -1);
         stampa(request->matrix, request->rows, request->colums);
         //Controllo se ce stata una vincita
