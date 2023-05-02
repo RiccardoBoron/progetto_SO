@@ -1,12 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include<errno.h>
+#include <errno.h>
 #include <sys/shm.h>
 #include <sys/sem.h>
 #include <sys/msg.h>
@@ -38,7 +37,7 @@ int create_sem_set(key_t semkey) {
 
     //Inizializzazione del set di semafori
     union semun arg;
-    unsigned short values[] = {0, 0, 1, 1};
+    unsigned short values[] = {0, 0, 1, 0};
     arg.array = values;
 
     if(semctl(semid, 0, SETALL, arg) == -1)
@@ -57,7 +56,7 @@ int main(int argc, char *argv[]) {
     int automaticGame = 0; //Variabile per far giocare il pc come avversario
 
     //Controllo input inseriti da linea di comando
-    if(argc != 2) {
+    if(argc < 2) {
         printf("Errore input\n");
         exit(1);
     }
@@ -105,16 +104,28 @@ int main(int argc, char *argv[]) {
         int mtype;
         int posRiga;
         int posColonna;
+        int automaticGame;
     } mossa;
 
     ssize_t siz = sizeof(struct myMsg) - sizeof(long);
     mossa.mtype = 1;
     mossa.posRiga = 0;
     mossa.posColonna = 0;
+    mossa.automaticGame = 0;
 
     //Acquisizione Gettoni giocatori dalla memoria condivisa
     Gettone1 = request->Gettone1;
     Gettone2 = request->Gettone2;
+
+
+    //Informo il server che giocherá come automaticGame
+    mossa.automaticGame = automaticGame;
+    if(msgsnd(msqid, &mossa, siz, 0) == -1){
+        errExit("msgsnd failed\n");
+    }
+    semOp(semid, 3, -1);
+
+
 
     //------------------------- GESTIONE DEI SEGNALI ------------------------//
     if(signal(SIGALRM, quit) == SIG_ERR)
@@ -122,8 +133,7 @@ int main(int argc, char *argv[]) {
 
 
     //------------------------- GESTIONE DEL GIOCO -------------------------//
-    srand(time(NULL)); //Per genenare nueri random
-    int maxNum = request->colums; //Numero massimo random da genenrare
+    
     int fine = 1; 
     while(fine == 1){
         semOp(semid, 2, -1);
@@ -143,23 +153,10 @@ int main(int argc, char *argv[]) {
 
         //Giocatore automatico
         if(automaticGame == 1){
-            colonna = rand() % (maxNum-0+1)+0;
-            int rigaValida = inserisci(request->matrix, request->rows, colonna);
-            int ok = 1;
-            do{
-                if(rigaValida != -1){
-                    //Invio al server dove deve mettere il gettone
-                    mossa.posRiga = rigaValida;
-                    mossa.posColonna = colonna;
-                    if(msgsnd(msqid, &mossa, siz, 0) == -1){
-                        errExit("msgsnd failed\n");
-                    }
-                    ok = 0;
-                }else {
-                    colonna = rand() % (maxNum-0+1)+0;
-                    rigaValida = inserisci(request->matrix, request->rows, colonna);
-                }
-            }while(ok == 1);
+            mossa.automaticGame = 1;
+            if(msgsnd(msqid, &mossa, siz, 0) == -1){
+                errExit("msgsnd failed\n");
+            }
         }else{
             //Giocatore normale
             do{
@@ -181,6 +178,7 @@ int main(int argc, char *argv[]) {
                     //Invio al server dove deve mettere il gettone
                     mossa.posRiga = rigaValida;
                     mossa.posColonna = colonna;
+                    mossa.automaticGame = 0;
                     if(msgsnd(msqid, &mossa, siz, 0) == -1){
                         errExit("msgsnd failed\n");
                     }
