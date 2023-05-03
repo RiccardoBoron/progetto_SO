@@ -54,18 +54,21 @@ char Gettone2;
 int main(int argc, char *argv[]) {
 
     int automaticGame = 0; //Variabile per far giocare il pc come avversario
+    char asterisco[] = "-"; //Capire perchè l' * non va
 
     //Controllo input inseriti da linea di comando
-    if(argc < 2) {
+    if(argc < 2 || argc > 3) {
         printf("Errore input\n");
         exit(1);
+    }else if(argc == 3 && strcmp(asterisco, argv[2])==0){
+        automaticGame = 1;
     }
 
     //L'autogiocatore per ora funziona inserendo come nome_utente il valore 1
-    int asterisco = atoi(argv[1]);
-    if(asterisco == 1){
-        automaticGame = 1;
-    }
+    //int asterisco = atoi(argv[1]);
+    //if(asterisco == 1){
+        //automaticGame = 1;
+    //}
 
 
     //Creazione delle chiavi dei samafori e della memoria condivisa e dalla message queue(uguali al server)

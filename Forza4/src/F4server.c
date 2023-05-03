@@ -21,8 +21,9 @@
 
 //------------------------- PROTOTIPI DI FUNZIONI -------------------------//
 void azzera(char m[MAXR][MAXC], int, int); //Inizializza la matrice
-int isValidInput(const char*, int); 
-int inserisci(char m[MAXR][MAXC], int, int);
+int isValidInput(const char*, int); //valida l'input
+int inserisci(char m[MAXR][MAXC], int, int); //Restituisce la posizione di inserimento del gettone
+int controlloVittoria(char m[MAXR][MAXR], int rows, int columns, char Gettone1, char Gettone2, int posColonna, int turn); //Controlla la vittori
 
 
 //------------------------- FUNZIONE PER LA CREAZIONE DI UN SET DI SEMAFORI -------------------------//
@@ -189,39 +190,14 @@ int main(int argc, char *argv[]) {
                         request->matrix[mossa.posRiga][mossa.posColonna] = Gettone2; //Inserimento gettone nella matrice
                     }
                 }
-                //Controllo vittoria
-                //Variabili per verificare la vittoria
-                int verticale1 = 0, verticale2 = 0;
-                int orizzontale1 = 0, orizzontale2 = 0;
 
-                //Controllo verticale
-                for(int i = 0; i < request->rows - 1; i++){
-                    if(turn == 2 && request->matrix[i][mossa.posColonna] == Gettone1 && request->matrix[i+1][mossa.posColonna] == Gettone1){
-                        verticale1 ++;
-                    }
-                    if(turn == 1 && request->matrix[i][mossa.posColonna] == Gettone2 && request->matrix[i+1][mossa.posColonna] == Gettone2){
-                        verticale2 ++;
-                    }
-                }
-
-                //Controllo orizzontale
-                for(int i = 0; i < request->rows; i++){
-                    for(int j = 0; j < request->colums; j++){
-                        if(turn == 2 && request->matrix[i][j] == Gettone1 && request->matrix[i][j+1] == Gettone1){
-                            orizzontale1 ++;
-                        }
-                        if(turn == 1 && request->matrix[i][j] == Gettone2 && request->matrix[i][j+1] == Gettone2){
-                            orizzontale1 ++;
-                        }
-                    }
-                }
-
-                //Comunico la vittoria
-                if(verticale1 == 3 || verticale2 == 3 || orizzontale1 == 3 || orizzontale2 == 3){
+                //CONTROLLO VITTORIA CON FUNZIONE
+                if(controlloVittoria(request->matrix, request->rows, request->colums, Gettone1, Gettone2, mossa.posColonna, turn) == 1){
                     request->vincitore = 1;
                     fine = 0;
                 }
-                //Comunico il pareggio
+
+                //CONTROLLO IL PAREGGIO
                 if(nt == request->rows * request->colums && request->vincitore == 0){
                     request->vincitore = 2;
                     fine = 0;
@@ -250,39 +226,13 @@ int main(int argc, char *argv[]) {
                 request->matrix[mossa.posRiga][mossa.posColonna] = Gettone2; //Inserimento gettone nella matrice
             }
 
-            //Variabili per verificare la vittoria
-            int verticale1 = 0, verticale2 = 0;
-            int orizzontale1 = 0, orizzontale2 = 0;
-
-            /* CONTROLLO SE QUALCUNO HA VINTO */
-            //Controllo verticale
-            for(int i = 0; i < request->rows - 1; i++){
-                if(turn == 2 && request->matrix[i][mossa.posColonna] == Gettone1 && request->matrix[i+1][mossa.posColonna] == Gettone1){
-                    verticale1 ++;
-                }
-                if(turn == 1 && request->matrix[i][mossa.posColonna] == Gettone2 && request->matrix[i+1][mossa.posColonna] == Gettone2){
-                    verticale2 ++;
-                }
-            }
-
-            //Controllo orizzontale
-            for(int i = 0; i < request->rows; i++){
-                for(int j = 0; j < request->colums; j++){
-                    if(turn == 2 && request->matrix[i][j] == Gettone1 && request->matrix[i][j+1] == Gettone1){
-                        orizzontale1 ++;
-                    }
-                    if(turn == 1 && request->matrix[i][j] == Gettone2 && request->matrix[i][j+1] == Gettone2){
-                        orizzontale1 ++;
-                    }
-                }
-            }
-
-            //Comunico la vittoria
-            if(verticale1 == 3 || verticale2 == 3 || orizzontale1 == 3 || orizzontale2 == 3){
+            //CONTROLLO VITTORIA CON FUNZIONE
+            if(controlloVittoria(request->matrix, request->rows, request->colums, Gettone1, Gettone2, mossa.posColonna, turn) == 1){
                 request->vincitore = 1;
                 fine = 0;
             }
-            //Comunico il pareggio
+            
+            //CONTROLLO PAREGGIO
             if(nt == request->rows * request->colums && request->vincitore == 0){
                 request->vincitore = 2;
                 fine = 0;
@@ -337,6 +287,41 @@ int inserisci(char m[MAXR][MAXC], int r, int c){
         if(m[i][c]==' ')
           return i;
     return -1;
+}
+
+//Controllo vittoria
+int controlloVittoria(char m[MAXR][MAXR],int rows, int columns, char Gettone1, char Gettone2, int posColonna, int turn){
+    //Variabili per verificare la vittoria
+    int verticale1 = 0, verticale2 = 0;
+    int orizzontale1 = 0, orizzontale2 = 0;
+
+    //Controllo verticale
+    for(int i = 0; i < rows; i++){
+        if(turn == 2 && m[i][posColonna] == Gettone1 && m[i+1][posColonna] == Gettone1){
+            verticale1++;
+        }
+        if(turn == 1 && m[i][posColonna] == Gettone2 && m[i+1][posColonna] == Gettone2){
+            verticale2++;
+        }
+    }
+
+    //Controllo orizzontale
+    for(int i = 0; i < rows; i++){
+        for(int j = 0; j < columns; j++){
+            if(turn == 2 && m[i][j] == Gettone1 && m[i][j+1] == Gettone1){
+                orizzontale1 ++;
+            }
+            if(turn == 1 && m[i][j] == Gettone2 && m[i][j+1] == Gettone2){
+                orizzontale2++;
+            }
+        }
+    }
+
+    //Ritorno 1 se qualcuno ha vinto, 0 se nessuno ha vinto
+    if(verticale1 == 3 || verticale2 == 3 || orizzontale1 == 3 || orizzontale2 == 3)
+        return 1;
+
+    return 0;
 }
 
 
