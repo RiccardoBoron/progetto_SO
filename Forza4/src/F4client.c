@@ -9,6 +9,7 @@
 #include <sys/shm.h>
 #include <sys/sem.h>
 #include <sys/msg.h>
+#include <signal.h>
 #include "errExit.h"
 #include "semaphore.h"
 #include "shared_memory.h"
@@ -26,6 +27,7 @@ void stampaRigaPiena(int c);
 int isValidInput(const char*, int); 
 int inserisci(char m[MAXR][MAXC], int, int);
 void quit(int sig);
+void sigHandler(int sig);
 
 
 //------------------------- FUNZIONE PER LA CREAZIONE DI UN SET DI SEMAFORI -------------------------//
@@ -50,6 +52,7 @@ int msqid = -1; //Inizializzazione msqid
 //Gettoni dei Giocatori
 char Gettone1;
 char Gettone2;
+int contaSegnale = 0;
 
 int main(int argc, char *argv[]) {
 
@@ -64,17 +67,19 @@ int main(int argc, char *argv[]) {
         automaticGame = 1;
     }
 
-    //L'autogiocatore per ora funziona inserendo come nome_utente il valore 1
-    //int asterisco = atoi(argv[1]);
-    //if(asterisco == 1){
-        //automaticGame = 1;
-    //}
-
-
     //Creazione delle chiavi dei samafori e della memoria condivisa e dalla message queue(uguali al server)
     key_t shmKey = 12; //Memoria condivisa
     key_t semKey = 23; //Semafori
     key_t msgKey = 10; //Coda dei messaggi
+    //set di segnali (non é inizializzato)
+    sigset_t mySet;
+    
+    //Iniziallizzazio di mySet con tutti i segnali
+    sigfillset(&mySet);
+    //Rimozione del segnale SIGINT da mySet
+    sigdelset(&mySet, SIGINT);
+    // blocking all signals but SIGINT
+    sigprocmask(SIG_SETMASK, &mySet, NULL);
 
     //Buffer nel quale salvo la posizione che chiedo al client per inserire il gettone
     char buffer[3];
@@ -131,7 +136,11 @@ int main(int argc, char *argv[]) {
 
 
     //------------------------- GESTIONE DEI SEGNALI ------------------------//
+
     if(signal(SIGALRM, quit) == SIG_ERR)
+        errExit("change signal handler failed");
+
+    if(signal(SIGINT, sigHandler) == SIG_ERR)
         errExit("change signal handler failed");
 
 
@@ -142,10 +151,12 @@ int main(int argc, char *argv[]) {
         semOp(semid, 2, -1);
         //Se nessuno ha ancora vinto o pareggiato continuo
         if(request->vincitore == 1){
+            stampa(request->matrix, request->rows, request->colums);
             printf("\n Hai perso!!\n"); 
             break;
         }
         if(request->vincitore == 2){
+            stampa(request->matrix, request->rows, request->colums);
             printf("\nPareggio!!\n");
             break;
         }
@@ -212,11 +223,11 @@ int main(int argc, char *argv[]) {
     semOp(semid, 0, 1); //Il server può terminare
 
     //------------------------- ELIMINAZIONE SEMAFORI E SHARED MEMORY -------------------------//
-    if(semctl(semid, 0, IPC_RMID, NULL) == -1)
-        errExit("rimozione set semafori FALLITA!");
+    //if(semctl(semid, 0, IPC_RMID, NULL) == -1)
+        //errExit("rimozione set semafori FALLITA!");
 
-    free_shared_memory(request);
-    remove_shared_memory(shmid);
+    //free_shared_memory(request);
+    //remove_shared_memory(shmid);
 
     return 0;
 }
@@ -283,5 +294,12 @@ int inserisci(char m[MAXR][MAXC], int r, int c){
 void quit(int sig){
     printf("\nTempo scaduto!!");
     exit(1);
+}
+
+void sigHandler(int sig){
+    contaSegnale++;
+    printf("\nSicuro di voler abbandonare?\n");
+    if(contaSegnale == 2)
+        exit(0);
 }
 

@@ -245,10 +245,11 @@ int main(int argc, char *argv[]) {
     }
 
     //Aspetto la terminazione dei client per eliminare semafori e shared memeory
-    printf("<Server> aspetto che i client terminino\n"); 
+    printf("<Server> aspetto che i Client terminino\n"); 
     semOp(semid, 0, -1); 
-    printf("Client 1 terminato, aspetto per Client 2 \n"); 
+    printf("<Server> Client 1 terminato, aspetto per Client 2 \n"); 
     semOp(semid, 0, -1);
+    printf("<Server> Client 2 terminato, FINE GIOCO\n");
 
     //------------------------- ELIMINAZIONE SEMAFORI E SHARED MEMORY -------------------------//
     if(semctl(semid, 0, IPC_RMID, NULL) == -1)
