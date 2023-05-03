@@ -222,13 +222,6 @@ int main(int argc, char *argv[]) {
     }
     semOp(semid, 0, 1); //Il server può terminare
 
-    //------------------------- ELIMINAZIONE SEMAFORI E SHARED MEMORY -------------------------//
-    //if(semctl(semid, 0, IPC_RMID, NULL) == -1)
-        //errExit("rimozione set semafori FALLITA!");
-
-    //free_shared_memory(request);
-    //remove_shared_memory(shmid);
-
     return 0;
 }
 
