@@ -23,7 +23,7 @@
 void azzera(char m[MAXR][MAXC], int, int); //Inizializza la matrice
 int isValidInput(const char*, int); //valida l'input
 int inserisci(char m[MAXR][MAXC], int, int); //Restituisce la posizione di inserimento del gettone
-int controlloVittoria(char m[MAXR][MAXR], int rows, int columns, char Gettone1, char Gettone2, int posColonna, int turn); //Controlla la vittori
+int controlloVittoria(char m[MAXR][MAXC], int rows, int columns, char Gettone1, char Gettone2, int posColonna, int turn); //Controlla la vittori
 
 
 //------------------------- FUNZIONE PER LA CREAZIONE DI UN SET DI SEMAFORI -------------------------//
@@ -97,6 +97,8 @@ int main(int argc, char *argv[]) {
     request->Gettone1 = Gettone1;
     request->Gettone2 = Gettone2;
     request->vincitore = 0;
+
+
     //Inizializzazione della matrice (tutta vuota all'inizio)
     azzera(request->matrix, rows, colums);
 
@@ -291,36 +293,38 @@ int inserisci(char m[MAXR][MAXC], int r, int c){
 }
 
 //Controllo vittoria
-int controlloVittoria(char m[MAXR][MAXR],int rows, int columns, char Gettone1, char Gettone2, int posColonna, int turn){
+int controlloVittoria(char m[MAXR][MAXC],int rows, int columns, char Gettone1, char Gettone2, int posColonna, int turn){
     //Variabili per verificare la vittoria
     int verticale1 = 0, verticale2 = 0;
     int orizzontale1 = 0, orizzontale2 = 0;
 
     //Controllo verticale
     for(int i = 0; i < rows; i++){
-        if(turn == 2 && m[i][posColonna] == Gettone1 && m[i+1][posColonna] == Gettone1){
+        if( m[i][posColonna] == Gettone1 && m[i+1][posColonna] == Gettone1){
             verticale1++;
         }
-        if(turn == 1 && m[i][posColonna] == Gettone2 && m[i+1][posColonna] == Gettone2){
+        if( m[i][posColonna] == Gettone2 && m[i+1][posColonna] == Gettone2){
             verticale2++;
         }
     }
+    if(verticale1 == 3 || verticale2 == 3)
+        return 1;
 
     //Controllo orizzontale
     for(int i = 0; i < rows; i++){
         for(int j = 0; j < columns; j++){
-            if(turn == 2 && m[i][j] == Gettone1 && m[i][j+1] == Gettone1){
-                orizzontale1 ++;
+            if( m[i][j] == Gettone1 && m[i][j+1] == Gettone1){
+                orizzontale1++;
             }
-            if(turn == 1 && m[i][j] == Gettone2 && m[i][j+1] == Gettone2){
+            if( m[i][j] == Gettone2 && m[i][j+1] == Gettone2){
                 orizzontale2++;
             }
         }
+        if(orizzontale1 == 3 || orizzontale2 == 3)
+            return 1;
+        orizzontale1 = 0;
+        orizzontale2 = 0;
     }
-
-    //Ritorno 1 se qualcuno ha vinto, 0 se nessuno ha vinto
-    if(verticale1 == 3 || verticale2 == 3 || orizzontale1 == 3 || orizzontale2 == 3)
-        return 1;
 
     return 0;
 }

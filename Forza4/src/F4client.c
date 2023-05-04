@@ -48,7 +48,9 @@ int create_sem_set(key_t semkey) {
     return semid;
 }
 
-int msqid = -1; //Inizializzazione msqid
+//Inizializzazione msqid
+int msqid = -1; 
+
 //Gettoni dei Giocatori
 char Gettone1;
 char Gettone2;
