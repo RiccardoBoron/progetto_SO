@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -59,15 +60,23 @@ int contaSegnale = 0;
 int main(int argc, char *argv[]) {
 
     int automaticGame = 0; //Variabile per far giocare il pc come avversario
+    int autoGameSignal = 0;
     char asterisco[] = "-"; //Capire perchè l' * non va
 
     //Controllo input inseriti da linea di comando
     if(argc < 2 || argc > 3) {
         printf("Errore input\n");
         exit(1);
-    }else if(argc == 3 && strcmp(asterisco, argv[2])==0){
+    }
+    if(argc == 3 && strcmp(asterisco, argv[2])==0){
         automaticGame = 1;
     }
+
+    int automatico = atoi(argv[1]);
+    if(automatico == 1){
+        autoGameSignal = 1;
+    }
+    
 
     //Creazione delle chiavi dei samafori e della memoria condivisa e dalla message queue(uguali al server)
     key_t shmKey = 12; //Memoria condivisa
@@ -89,20 +98,6 @@ int main(int argc, char *argv[]) {
     //------------------------- CREAZIONE SET DI SEMAFORI -------------------------//
     int semid = create_sem_set(semKey);
 
-    //------------------------- ATTESA SECONDO GIOCATORE -------------------------//
-    //Avviso il server che il client é arrivato
-    semOp(semid, 0, 1);
-
-    //Attendo il via del server
-    semOp(semid, 1, -1);
-
-    //------------------------- CREAZIONE MEMEORIA CONDIVISA -------------------------//
-    //Acquisisco il segmento di memoria condivisa
-    int shmid = alloc_shared_memory(shmKey, sizeof(struct Request));
-
-    //Attacco il segmento di memoria condivisa
-    struct Request *request = (struct Request *)get_shared_memory(shmid, 0);
-
     //------------------------- CREAZIONE CODA DEI MESSAGGI -------------------------//
     int msqid = msgget(msgKey, IPC_CREAT | S_IRUSR | S_IWUSR);
     if(msqid == -1){
@@ -114,31 +109,40 @@ int main(int argc, char *argv[]) {
         int mtype;
         int posRiga;
         int posColonna;
-        int automaticGame;
     } mossa;
 
     ssize_t siz = sizeof(struct myMsg) - sizeof(long);
     mossa.mtype = 1;
     mossa.posRiga = 0;
     mossa.posColonna = 0;
-    mossa.automaticGame = 0;
+    
 
+    //------------------------- CREAZIONE MEMEORIA CONDIVISA -------------------------//
+    //Acquisisco il segmento di memoria condivisa
+    int shmid = alloc_shared_memory(shmKey, sizeof(struct Request));
+
+    //Attacco il segmento di memoria condivisa
+    struct Request *request = (struct Request *)get_shared_memory(shmid, 0);
+
+    //Avviso il server che gioca in automatico
+    if(automaticGame == 1){
+        request->vincitore = 1;
+    }
+
+
+    //------------------------- ATTESA SECONDO GIOCATORE -------------------------//
+    //Avviso il server che il client é arrivato
+    semOp(semid, 0, 1);
+    //Attendo il via del server
+    semOp(semid, 1, -1);
+    
     //Acquisizione Gettoni giocatori dalla memoria condivisa
     Gettone1 = request->Gettone1;
     Gettone2 = request->Gettone2;
-
-
-    //Informo il server che giocherá come automaticGame
-    mossa.automaticGame = automaticGame;
-    if(msgsnd(msqid, &mossa, siz, 0) == -1){
-        errExit("msgsnd failed\n");
-    }
-    semOp(semid, 3, -1);
-
+    request->vincitore = 0;
 
 
     //------------------------- GESTIONE DEI SEGNALI ------------------------//
-
     if(signal(SIGALRM, quit) == SIG_ERR)
         errExit("change signal handler failed");
 
@@ -147,7 +151,6 @@ int main(int argc, char *argv[]) {
 
 
     //------------------------- GESTIONE DEL GIOCO -------------------------//
-    
     int fine = 1; 
     while(fine == 1){
         semOp(semid, 2, -1);
@@ -164,12 +167,26 @@ int main(int argc, char *argv[]) {
         }
         stampa(request->matrix, request->rows, request->colums);
         
+       
         //Inserimento della colonna nella sruttura e invio al server
         int colonna = 0;
 
         //Giocatore automatico
-        if(automaticGame == 1){
-            mossa.automaticGame = 1;
+        if(autoGameSignal == 1){
+            printf("sono qua dentro");
+            sleep(2);
+            srand(time(NULL));
+            int rigaValida = 0;
+            int maxNum = request->colums;
+
+            colonna = rand() % (maxNum-0+1)+0;
+            rigaValida = inserisci(request->matrix, request->rows, colonna);
+            while(rigaValida == -1){
+                colonna = rand() % (maxNum-0+1)+0;
+                rigaValida = inserisci(request->matrix, request->rows, colonna);
+            }
+            mossa.posRiga = rigaValida;
+            mossa.posColonna = colonna;
             if(msgsnd(msqid, &mossa, siz, 0) == -1){
                 errExit("msgsnd failed\n");
             }
@@ -194,7 +211,6 @@ int main(int argc, char *argv[]) {
                     //Invio al server dove deve mettere il gettone
                     mossa.posRiga = rigaValida;
                     mossa.posColonna = colonna;
-                    mossa.automaticGame = 0;
                     if(msgsnd(msqid, &mossa, siz, 0) == -1){
                         errExit("msgsnd failed\n");
                     }
@@ -210,6 +226,7 @@ int main(int argc, char *argv[]) {
             }while(ok == 1);
         }
         semOp(semid, 1, -1);
+        
         stampa(request->matrix, request->rows, request->colums);
         //Controllo se ce stata una vincita
         if(request->vincitore == 1){
@@ -220,7 +237,9 @@ int main(int argc, char *argv[]) {
         if(request->vincitore == 2){
             printf("\nPareggio\n");
             fine = 0;
-        }
+         } 
+         if(autoGameSignal == 1)
+            semOp(semid, 3, -1);
     }
     semOp(semid, 0, 1); //Il server può terminare
 
