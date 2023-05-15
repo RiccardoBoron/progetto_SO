@@ -68,6 +68,7 @@ int main(int argc, char *argv[]) {
     if(argc == 3 && strcmp(asterisco, argv[2])==0){
         automaticGame = 1;
     }
+    
     //Imposto la variabile autoGameSignal a 1 in modo che il client giochi in modo automatico
     int automatico = atoi(argv[1]);
     if(automatico == 1){

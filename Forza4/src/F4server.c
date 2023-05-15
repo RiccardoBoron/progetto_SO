@@ -230,9 +230,13 @@ int main(int argc, char *argv[]) {
 
     free_shared_memory(shared);
     remove_shared_memory(shmid);
-    //free_shared_memory(sharedMemory);
-    //remove_shared_memory(shmId);
 
+    if (shmdt(sharedMemory) == -1)
+        errExit("shmdt failed\n"); 
+
+    if (shmctl(shmId, IPC_RMID, NULL) == -1)
+        errExit("shmctl failed");
+    
     return 0;
 }
 
