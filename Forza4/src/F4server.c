@@ -17,19 +17,20 @@
 
 
 //------------------------- PROTOTIPI DI FUNZIONI -------------------------//
-void azzera(char *m, int, int); //Inizializza la matrice
-int controlloVittoria(char *m, int rows, int columns, char Gettone1, char Gettone2, int posColonna, int turn); //Controlla la vittori
+void azzera(char *m, int, int);
+int controlloVittoria(char *m, int rows, int columns, char Gettone1, char Gettone2, int posColonna);
 void sigHandler(int sig);
 
+//Variabili globali
 int contaSegnale = 0;
 int semid = 0;
 int shmid = 0;
-struct Request *request;
+struct Shared *shared;
 
 
 //------------------------- FUNZIONE PER LA CREAZIONE DI UN SET DI SEMAFORI -------------------------//
 int create_sem_set(key_t semkey) {
-    //Creazione di un set di 2 semafori
+    //Creazione di un set di 4 semafori
     int semid = semget(semkey, 4, IPC_CREAT | S_IRUSR | S_IWUSR);
     if(semid == -1)
         errExit("semget failed");
@@ -45,16 +46,18 @@ int create_sem_set(key_t semkey) {
     return semid;
 }
 
-int msqid = -1; //Inizializzazione msqid
+//Inizializzazione msqid
+int msqid = -1; 
 
 int main(int argc, char *argv[]) {
 
-    //Creazione delle chiavi dei samafori e della memoria condivisa
+    //Key
     key_t shmKey = 12; //Memoria condivisa
     key_t semKey = 23; //Semafori
     key_t msgKey = 10; //Coda dei messaggi
-    key_t shmKey2 = 34; //Memoria condivisa 2 
-    //set di segnali (non é inizializzato)
+    key_t shmKey2 = 34; //Memoria condivisa usata come matrice
+
+    //set di segnali
     sigset_t mySet;
     
     //Iniziallizzazio di mySet con tutti i segnali
@@ -67,7 +70,7 @@ int main(int argc, char *argv[]) {
 
     //Controllo input inseriti da linea di comando
     if(argc != 5) {
-        printf("Errore input\n");
+        printf("\nErrore input: devi inserire ./server dim_righe dim_colonne gettone1 gettone2\n");
         exit(1);
     }
 
@@ -84,21 +87,19 @@ int main(int argc, char *argv[]) {
     char Gettone2 = *argv[4];
 
 
-    //Allocazione del segmento di memoria condivisa
-    shmid = alloc_shared_memory(shmKey, sizeof(struct Request));
+    //------------------------- CREAZIONE MEMEORIA CONDIVISA -------------------------//
+    
+    //memoria condivisa dove salvo la dimensione delle righe e delle colonne e una variabile per determinare il vincitore
+    shmid = alloc_shared_memory(shmKey, sizeof(struct Shared));
+    shared = (struct Shared*)get_shared_memory(shmid, 0);
 
-    //Attacco del segmento di memoria condivisa
-    request = (struct Request*)get_shared_memory(shmid, 0);
-
-
-
-    //Creazione della memoria condivisa per la matrice
+   //Memoria condivisa che viene utilizzata come una matrice
     int shmId = shmget(shmKey2, rows * colums * sizeof(int), IPC_CREAT | S_IRUSR | S_IWUSR);
     int *sharedMemory = (int*)shmat(shmId, NULL, 0);
     char(*matrix)[colums] = (char(*)[colums])sharedMemory;
 
 
-    //Creazione di un set di semafori
+    //------------------------- CREAZIONE SET DI SEMAFORI -------------------------//
     semid = create_sem_set(semKey);
 
     //------------------------- CREAZIONE CODA DEI MESSAGGI -------------------------//
@@ -107,7 +108,7 @@ int main(int argc, char *argv[]) {
         errExit("msgget failed\n");
     }
 
-    //Struttura coda dei messaggi
+    //Struttura condivisa con coda dei messaggi, viene utilizzata per inserire il gettone nella posizione giusta
     struct myMsg{
         int mtype;
         int posRiga;
@@ -130,8 +131,8 @@ int main(int argc, char *argv[]) {
     printf("\n<Server> Client 1 arrivato, attendo Client 2\n");
 
     //Aspetto che i client mi dicano se devo giocare in modalitá automaticGame
-    int autoGame = request->vincitore;
-    request->vincitore = 0;
+    int autoGame = shared->vincitore;
+    shared->vincitore = 0;
 
     //Se gioco in autogame il server si duplica ed esegue la parte di client relativa all'autogiocatore
     if(autoGame == 1){
@@ -145,7 +146,7 @@ int main(int argc, char *argv[]) {
             if(execv("./client", args) == -1){
                 errExit("execv");
             }
-            while(request->vincitore == 0);
+            while(shared->vincitore == 0);
             printf("Figlio terminato");
             exit(0);
             
@@ -156,18 +157,20 @@ int main(int argc, char *argv[]) {
     semOp(semid, 0, -1); //Attesa secondo client
     printf("\n<Server> Client 2 arrivato\n");
     
-   //------------------------- INIZIALIZZAZIONE CAMPO DI GIOCO -------------------------//
+    //------------------------- INIZIALIZZAZIONE CAMPO DI GIOCO -------------------------//
     printf("\n<Server> Preparo il campo di gioco\n");
-    //Inserimento delle righe e colonne nella matrice della struttura request
-    request->rows = rows;
-    request->colums = colums;
-    request->Gettone1 = Gettone1;
-    request->Gettone2 = Gettone2;
-    request->vincitore = 0;
 
+    //Inserimento delle righe e colonne nella memoria condivisa
+    shared->rows = rows;
+    shared->colums = colums;
+    shared->Gettone1 = Gettone1;
+    shared->Gettone2 = Gettone2;
+    shared->vincitore = 0;
 
     //Inizializzazione della matrice (tutta vuota all'inizio)
     azzera(&matrix[0][0], rows, colums);
+
+    printf("\n<Server> Campo di gioco pronto, gioco in corso\n");
 
     //Il server fa partire i client che stampano il campo da gioco
     semOp(semid, 1, 1);
@@ -192,14 +195,14 @@ int main(int argc, char *argv[]) {
         }
 
         //CONTROLLO VITTORIA CON FUNZIONE
-        if(controlloVittoria(&matrix[0][0], request->rows, request->colums, Gettone1, Gettone2, mossa.posColonna, turn) == 1){
-            request->vincitore = 1;
+        if(controlloVittoria(&matrix[0][0], shared->rows, shared->colums, Gettone1, Gettone2, mossa.posColonna) == 1){
+            shared->vincitore = 1;
             fine = 0;
         }
             
         //CONTROLLO PAREGGIO
-        if(nt == request->rows * request->colums && request->vincitore == 0){
-            request->vincitore = 2;
+        if(nt == shared->rows * shared->colums && shared->vincitore == 0){
+            shared->vincitore = 2;
             fine = 0;
         }
         
@@ -212,7 +215,7 @@ int main(int argc, char *argv[]) {
     
 
     //Aspetto la terminazione dei client per eliminare semafori e shared memeory
-    printf("<Server> aspetto che i Client terminino\n"); 
+    printf("<Server> Aspetto che i Client terminino\n"); 
     semOp(semid, 0, -1); 
     printf("<Server> Client 1 terminato, aspetto per Client 2 \n"); 
     semOp(semid, 0, -1);
@@ -225,7 +228,7 @@ int main(int argc, char *argv[]) {
     if(semctl(semid, 0, IPC_RMID, NULL) == -1)
         errExit("rimozione set semafori FALLITA!");
 
-    free_shared_memory(request);
+    free_shared_memory(shared);
     remove_shared_memory(shmid);
     //free_shared_memory(sharedMemory);
     //remove_shared_memory(shmId);
@@ -233,7 +236,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-//Inizializza il campo da gioco con tutti 0 ovvero vuoto
+//Inizializza il campo da gioco
 void azzera(char *m, int r, int c){
     int i,j;
     for(i=0; i<r; i++)
@@ -242,17 +245,17 @@ void azzera(char *m, int r, int c){
 }
 
 //Controllo vittoria
-int controlloVittoria(char *m,int rows, int columns, char Gettone1, char Gettone2, int posColonna, int turn){
+int controlloVittoria(char *m,int rows, int columns, char Gettone1, char Gettone2, int posColonna){
     //Variabili per verificare la vittoria
     int verticale1 = 0, verticale2 = 0;
     int orizzontale1 = 0, orizzontale2 = 0;
 
     //Controllo verticale
     for(int i = 0; i < rows; i++){
-        if( *(m + i * columns + posColonna) == Gettone1 && *(m + i + 1 * columns + posColonna) == Gettone1){
+        if( *(m + i * columns + posColonna) == Gettone1 && *(m + (i + 1) * columns + posColonna) == Gettone1){
             verticale1++;
         }
-        if( *(m + i * columns + posColonna) == Gettone2 && *(m + i + 1 * columns + posColonna)== Gettone2){
+        if( *(m + i * columns + posColonna) == Gettone2 && *(m + (i + 1) * columns + posColonna)== Gettone2){
             verticale2++;
         }
     }
@@ -277,13 +280,15 @@ int controlloVittoria(char *m,int rows, int columns, char Gettone1, char Gettone
 
     return 0;
 }
+
+//Gestione del segnale Ctrl^C
 //DA RIVEDERE PERCHÉ NON FUNZIONA IL CONTROLLO DEI SEGNALI
 void sigHandler(int sig){
     contaSegnale++;
     if(contaSegnale == 1)
         printf("\nSicuro di voler abbandonare?\n");
     if(contaSegnale == 2){
-        request->vincitore = 3;
+        shared->vincitore = 3;
         //semOp(semid, 1, 1);
         //semOp(semid, 3, 1);
         //semOp(semid, 2, 1);
@@ -292,7 +297,7 @@ void sigHandler(int sig){
         if(semctl(semid, 0, IPC_RMID, NULL) == -1)
             errExit("rimozione set semafori FALLITA!");
 
-        free_shared_memory(request);
+        free_shared_memory(shared);
         remove_shared_memory(shmid);
         exit(0);
     }     
