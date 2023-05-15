@@ -9,7 +9,7 @@
 
 // Questa truttura di richiesta rappresenta una richiesta di invio da parte del client
 struct Request {
-    char matrix[50][50];
+    //char matrix[50][50];
     int rows;
     int colums;
     char Gettone1;

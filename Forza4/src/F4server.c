@@ -10,18 +10,21 @@
 #include <sys/shm.h>
 #include <sys/sem.h>
 #include <sys/msg.h>
+#include <signal.h>
 #include "errExit.h"
 #include "semaphore.h"
 #include "shared_memory.h"
 
-//------------------------- COSTANTI -------------------------//
-//Dimensione massima delle righe e colonne della Matrice
-#define MAXR 50
-#define MAXC 50
 
 //------------------------- PROTOTIPI DI FUNZIONI -------------------------//
-void azzera(char m[MAXR][MAXC], int, int); //Inizializza la matrice
-int controlloVittoria(char m[MAXR][MAXC], int rows, int columns, char Gettone1, char Gettone2, int posColonna, int turn); //Controlla la vittori
+void azzera(char *m, int, int); //Inizializza la matrice
+int controlloVittoria(char *m, int rows, int columns, char Gettone1, char Gettone2, int posColonna, int turn); //Controlla la vittori
+void sigHandler(int sig);
+
+int contaSegnale = 0;
+int semid = 0;
+int shmid = 0;
+struct Request *request;
 
 
 //------------------------- FUNZIONE PER LA CREAZIONE DI UN SET DI SEMAFORI -------------------------//
@@ -50,6 +53,16 @@ int main(int argc, char *argv[]) {
     key_t shmKey = 12; //Memoria condivisa
     key_t semKey = 23; //Semafori
     key_t msgKey = 10; //Coda dei messaggi
+    key_t shmKey2 = 34; //Memoria condivisa 2 
+    //set di segnali (non é inizializzato)
+    sigset_t mySet;
+    
+    //Iniziallizzazio di mySet con tutti i segnali
+    sigfillset(&mySet);
+    //Rimozione del segnale SIGINT da mySet
+    sigdelset(&mySet, SIGINT);
+    // blocking all signals but SIGINT
+    sigprocmask(SIG_SETMASK, &mySet, NULL);
 
 
     //Controllo input inseriti da linea di comando
@@ -72,13 +85,21 @@ int main(int argc, char *argv[]) {
 
 
     //Allocazione del segmento di memoria condivisa
-    int shmid = alloc_shared_memory(shmKey, sizeof(struct Request));
+    shmid = alloc_shared_memory(shmKey, sizeof(struct Request));
 
     //Attacco del segmento di memoria condivisa
-    struct Request *request = (struct Request*)get_shared_memory(shmid, 0);
+    request = (struct Request*)get_shared_memory(shmid, 0);
+
+
+
+    //Creazione della memoria condivisa per la matrice
+    int shmId = shmget(shmKey2, rows * colums * sizeof(int), IPC_CREAT | S_IRUSR | S_IWUSR);
+    int *sharedMemory = (int*)shmat(shmId, NULL, 0);
+    char(*matrix)[colums] = (char(*)[colums])sharedMemory;
+
 
     //Creazione di un set di semafori
-    int semid = create_sem_set(semKey);
+    semid = create_sem_set(semKey);
 
     //------------------------- CREAZIONE CODA DEI MESSAGGI -------------------------//
     int msqid = msgget(msgKey, IPC_CREAT | S_IRUSR | S_IWUSR);
@@ -98,7 +119,9 @@ int main(int argc, char *argv[]) {
     mossa.posRiga = 0;
     mossa.posColonna = 0;
     
-
+    //------------------------ GESTIONE DEI SEGNALI ------------------------//
+    if(signal(SIGINT, sigHandler) == SIG_ERR)
+        errExit("change signal handler failed");
 
 
     //------------------------- IL SERVER ASPETTA I CLIENT -------------------------//
@@ -119,9 +142,6 @@ int main(int argc, char *argv[]) {
             char *args[] = {"giocatore", "1", NULL};
             //Faccio la exec()
             printf("\nDuplicazione server\n");
-            //if(execl("client","client", NULL, (char *) NULL) == -1){
-                //errExit("exev failed"); 
-            //}
             if(execv("./client", args) == -1){
                 errExit("execv");
             }
@@ -147,7 +167,7 @@ int main(int argc, char *argv[]) {
 
 
     //Inizializzazione della matrice (tutta vuota all'inizio)
-    azzera(request->matrix, rows, colums);
+    azzera(&matrix[0][0], rows, colums);
 
     //Il server fa partire i client che stampano il campo da gioco
     semOp(semid, 1, 1);
@@ -164,15 +184,15 @@ int main(int argc, char *argv[]) {
         }
         nt ++; //Incremento il numero di mosse totali
         if(turn == 1){
-            turn ++; 
-            request->matrix[mossa.posRiga][mossa.posColonna] = Gettone1; //Inserimento gettone nella matrice
+            turn ++;
+            matrix[mossa.posRiga][mossa.posColonna] = Gettone1; //Inserimento gettone nella matrice
         } else {
             turn --;
-            request->matrix[mossa.posRiga][mossa.posColonna] = Gettone2; //Inserimento gettone nella matrice
+            matrix[mossa.posRiga][mossa.posColonna] = Gettone2; //Inserimento gettone nella matrice
         }
 
         //CONTROLLO VITTORIA CON FUNZIONE
-        if(controlloVittoria(request->matrix, request->rows, request->colums, Gettone1, Gettone2, mossa.posColonna, turn) == 1){
+        if(controlloVittoria(&matrix[0][0], request->rows, request->colums, Gettone1, Gettone2, mossa.posColonna, turn) == 1){
             request->vincitore = 1;
             fine = 0;
         }
@@ -207,30 +227,32 @@ int main(int argc, char *argv[]) {
 
     free_shared_memory(request);
     remove_shared_memory(shmid);
+    //free_shared_memory(sharedMemory);
+    //remove_shared_memory(shmId);
 
     return 0;
 }
 
 //Inizializza il campo da gioco con tutti 0 ovvero vuoto
-void azzera(char m[MAXR][MAXC], int r, int c){
+void azzera(char *m, int r, int c){
     int i,j;
     for(i=0; i<r; i++)
         for(j=0; j<c; j++)
-          m[i][j]=' ';
+          *(m + i * c + j) = ' ';
 }
 
 //Controllo vittoria
-int controlloVittoria(char m[MAXR][MAXC],int rows, int columns, char Gettone1, char Gettone2, int posColonna, int turn){
+int controlloVittoria(char *m,int rows, int columns, char Gettone1, char Gettone2, int posColonna, int turn){
     //Variabili per verificare la vittoria
     int verticale1 = 0, verticale2 = 0;
     int orizzontale1 = 0, orizzontale2 = 0;
 
     //Controllo verticale
     for(int i = 0; i < rows; i++){
-        if( m[i][posColonna] == Gettone1 && m[i+1][posColonna] == Gettone1){
+        if( *(m + i * columns + posColonna) == Gettone1 && *(m + i + 1 * columns + posColonna) == Gettone1){
             verticale1++;
         }
-        if( m[i][posColonna] == Gettone2 && m[i+1][posColonna] == Gettone2){
+        if( *(m + i * columns + posColonna) == Gettone2 && *(m + i + 1 * columns + posColonna)== Gettone2){
             verticale2++;
         }
     }
@@ -240,10 +262,10 @@ int controlloVittoria(char m[MAXR][MAXC],int rows, int columns, char Gettone1, c
     //Controllo orizzontale
     for(int i = 0; i < rows; i++){
         for(int j = 0; j < columns; j++){
-            if( m[i][j] == Gettone1 && m[i][j+1] == Gettone1){
+            if( *(m + i * columns + j) == Gettone1 && *(m + i * columns + j + 1) == Gettone1){
                 orizzontale1++;
             }
-            if( m[i][j] == Gettone2 && m[i][j+1] == Gettone2){
+            if( *(m + i * columns + j) == Gettone2 && *(m + i * columns + j + 1) == Gettone2){
                 orizzontale2++;
             }
         }
@@ -254,6 +276,26 @@ int controlloVittoria(char m[MAXR][MAXC],int rows, int columns, char Gettone1, c
     }
 
     return 0;
+}
+//DA RIVEDERE PERCHÉ NON FUNZIONA IL CONTROLLO DEI SEGNALI
+void sigHandler(int sig){
+    contaSegnale++;
+    if(contaSegnale == 1)
+        printf("\nSicuro di voler abbandonare?\n");
+    if(contaSegnale == 2){
+        request->vincitore = 3;
+        //semOp(semid, 1, 1);
+        //semOp(semid, 3, 1);
+        //semOp(semid, 2, 1);
+        semOp(semid, 0, -1);
+        semOp(semid, 0, -1);
+        if(semctl(semid, 0, IPC_RMID, NULL) == -1)
+            errExit("rimozione set semafori FALLITA!");
+
+        free_shared_memory(request);
+        remove_shared_memory(shmid);
+        exit(0);
+    }     
 }
 
 

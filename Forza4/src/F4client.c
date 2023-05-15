@@ -23,10 +23,10 @@
 
 
 //------------------------- PROTOTIPI DI FUNZIONI -------------------------//
-void stampa(char m[MAXR][MAXC], int, int);
+void stampa(char *m, int, int);
 void stampaRigaPiena(int c);
 int isValidInput(const char*, int); 
-int inserisci(char m[MAXR][MAXC], int, int);
+int inserisci(char *m, int, int);
 void quit(int sig);
 void sigHandler(int sig);
 
@@ -82,6 +82,7 @@ int main(int argc, char *argv[]) {
     key_t shmKey = 12; //Memoria condivisa
     key_t semKey = 23; //Semafori
     key_t msgKey = 10; //Coda dei messaggi
+    key_t shmKey2 = 34; //Memoria condivisa 2 
     //set di segnali (non é inizializzato)
     sigset_t mySet;
     
@@ -124,6 +125,12 @@ int main(int argc, char *argv[]) {
     //Attacco il segmento di memoria condivisa
     struct Request *request = (struct Request *)get_shared_memory(shmid, 0);
 
+    //Memoria condivisa per matrice
+    int shmId = shmget(shmKey2, request->rows * request->colums * sizeof(char),  IPC_CREAT | S_IRUSR | S_IWUSR);
+    int *sharedMemory = (int*)shmat(shmId, NULL, 0);
+    char(*matrix)[request->colums] = (char(*)[request->colums])sharedMemory;
+
+
     //Avviso il server che gioca in automatico
     if(automaticGame == 1){
         request->vincitore = 1;
@@ -156,16 +163,21 @@ int main(int argc, char *argv[]) {
         semOp(semid, 2, -1);
         //Se nessuno ha ancora vinto o pareggiato continuo
         if(request->vincitore == 1){
-            stampa(request->matrix, request->rows, request->colums);
+            stampa(&matrix[0][0], request->rows, request->colums);
             printf("\n Hai perso!!\n"); 
             break;
         }
         if(request->vincitore == 2){
-            stampa(request->matrix, request->rows, request->colums);
+            stampa(&matrix[0][0], request->rows, request->colums);
             printf("\nPareggio!!\n");
             break;
         }
-        stampa(request->matrix, request->rows, request->colums);
+        if(request->vincitore == 3){
+            printf("\nIl gioco é stato terminato dall'esterno\n");
+            break;
+            //exit(0);
+        }
+        stampa(&matrix[0][0], request->rows, request->colums);
         
        
         //Inserimento della colonna nella sruttura e invio al server
@@ -173,17 +185,16 @@ int main(int argc, char *argv[]) {
 
         //Giocatore automatico
         if(autoGameSignal == 1){
-            printf("sono qua dentro");
-            sleep(2);
+            sleep(1);
             srand(time(NULL));
             int rigaValida = 0;
             int maxNum = request->colums;
 
             colonna = rand() % (maxNum-0+1)+0;
-            rigaValida = inserisci(request->matrix, request->rows, colonna);
+            rigaValida = inserisci(&matrix[0][0], request->rows, colonna);
             while(rigaValida == -1){
                 colonna = rand() % (maxNum-0+1)+0;
-                rigaValida = inserisci(request->matrix, request->rows, colonna);
+                rigaValida = inserisci(&matrix[0][0], request->rows, colonna);
             }
             mossa.posRiga = rigaValida;
             mossa.posColonna = colonna;
@@ -204,7 +215,7 @@ int main(int argc, char *argv[]) {
                 }
             }while(colonna == -1); //Continuo a chiedere la colonna fintanto che mi da un input valido
 
-            int rigaValida = inserisci(request->matrix, request->rows, colonna); //Acquisisco la riga dove inserirla
+            int rigaValida = inserisci(&matrix[0][0], request->rows, colonna); //Acquisisco la riga dove inserirla
             int ok = 1;
             do{
                 if(rigaValida != -1){
@@ -221,13 +232,13 @@ int main(int argc, char *argv[]) {
                     printf("\nGiocatore %s inserisci la colonna:  ", argv[1]);
                     fgets(buffer, sizeof(buffer), stdin);
                     colonna = isValidInput(buffer, request->colums);
-                    rigaValida = inserisci(request->matrix, request->rows, colonna);
+                    rigaValida = inserisci(&matrix[0][0], request->rows, colonna);
                 }
             }while(ok == 1);
         }
         semOp(semid, 1, -1);
         
-        stampa(request->matrix, request->rows, request->colums);
+        stampa(&matrix[0][0], request->rows, request->colums);
         //Controllo se ce stata una vincita
         if(request->vincitore == 1){
             printf("\nHai Vinto !!!\n");
@@ -238,6 +249,11 @@ int main(int argc, char *argv[]) {
             printf("\nPareggio\n");
             fine = 0;
          } 
+         if(request->vincitore == 3){
+            printf("\nIl gioco é stato terminato dall'esterno\n");
+            break;
+            //exit(0);
+        }
          if(autoGameSignal == 1)
             semOp(semid, 3, -1);
     }
@@ -248,7 +264,7 @@ int main(int argc, char *argv[]) {
 
 
 //Funzione che stampa il campo di gioco
-void stampa(char m[MAXR][MAXC], int r, int c) {
+void stampa(char *m, int r, int c) {
     int i,j;
     printf("\n");
     stampaRigaPiena(c);  //Stampo prima riga |---|---|--...
@@ -256,7 +272,7 @@ void stampa(char m[MAXR][MAXC], int r, int c) {
     for(i=0; i<r; i++){ //Stampo le righe centrali
         printf("   |");
         for(j=0; j<c; j++)
-            printf(" %c |", m[i][j]);
+            printf(" %c |", *(m + i * c + j));
         printf("\n");
         stampaRigaPiena(c);
     }
@@ -296,10 +312,10 @@ int isValidInput(const char *s, int coordinata) {
 }
 
 // Convalida la colonna, se é libera, nel caso restituisce la casella piu bassa libera
-int inserisci(char m[MAXR][MAXC], int r, int c){
+int inserisci(char *m, int r, int c){
     int i;
     for(i=r-1; i>=0; i--)
-        if(m[i][c]==' ')
+        if(*(m + i * r + c) == ' ')
           return i;
     return -1;
 }
