@@ -13,6 +13,7 @@ struct Shared {
     int colums;
     char Gettone1;
     char Gettone2;
+    int gettoneInizio;
     int vincitore;
 };
 

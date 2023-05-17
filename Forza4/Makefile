@@ -1,8 +1,8 @@
 CFLAGS=-Wall -std=gnu99
 INCLUDES=-I./inc
 
-SERVER_SRCS=src/errExit.c src/semaphore.c src/shared_memory.c src/F4server.c  
-CLIENT_SRCS=src/errExit.c src/semaphore.c src/shared_memory.c src/F4client.c 
+SERVER_SRCS=src/errExit.c src/semaphore.c src/shared_memory.c src/message_queue.c src/F4server.c  
+CLIENT_SRCS=src/errExit.c src/semaphore.c src/shared_memory.c src/message_queue.c src/F4client.c 
 
 SERVER_OBJS=$(SERVER_SRCS:.c=.o)
 CLIENT_OBJS=$(CLIENT_SRCS:.c=.o)

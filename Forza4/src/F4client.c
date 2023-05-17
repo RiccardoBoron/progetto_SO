@@ -14,6 +14,7 @@
 #include "errExit.h"
 #include "semaphore.h"
 #include "shared_memory.h"
+#include "message_queue.h"
 
 
 
@@ -24,6 +25,7 @@ int isValidInput(const char*, int);
 int inserisci(char *m, int, int);
 void quit(int sig);
 void sigHandler(int sig);
+
 
 
 //------------------------- FUNZIONE PER LA CREAZIONE DI UN SET DI SEMAFORI -------------------------//
@@ -46,12 +48,12 @@ int create_sem_set(key_t semkey) {
 
 //Inizializzazione msqid
 int msqid = -1; 
-
+int semid = 0;
 //Gettoni dei Giocatori
 char Gettone1;
 char Gettone2;
 
-int contaSegnale = 0;
+struct Shared *shared;
 
 int main(int argc, char *argv[]) {
 
@@ -81,46 +83,41 @@ int main(int argc, char *argv[]) {
     key_t msgKey = 10; //Coda dei messaggi
     key_t shmKey2 = 34; //Memoria condivisa per la matrice
 
-    //set di segnali (non é inizializzato)
+    //set di segnali
     sigset_t mySet;
-    
     //Iniziallizzazio di mySet con tutti i segnali
     sigfillset(&mySet);
     //Rimozione del segnale SIGINT da mySet
     sigdelset(&mySet, SIGINT);
+    sigdelset(&mySet, SIGALRM);
     // blocking all signals but SIGINT
     sigprocmask(SIG_SETMASK, &mySet, NULL);
 
     //Buffer nel quale salvo la posizione che chiedo al client per inserire il gettone
-    char buffer[3];
+    char buffer[100];
 
     //------------------------- CREAZIONE SET DI SEMAFORI -------------------------//
-    int semid = create_sem_set(semKey);
+    semid = create_sem_set(semKey);
 
     //------------------------- CREAZIONE CODA DEI MESSAGGI -------------------------//
-    int msqid = msgget(msgKey, IPC_CREAT | S_IRUSR | S_IWUSR);
+    msqid = msgget(msgKey, IPC_CREAT | S_IRUSR | S_IWUSR);
     if(msqid == -1){
         errExit("msgget failed\n");
     }
 
     //Struttura condivisa con coda dei messaggi, viene utilizzata per inserire il gettone nella posizione giusta
-    struct myMsg{
-        int mtype;
-        int posRiga; 
-        int posColonna;
-    } mossa;
-
+   
+    struct myMsg mossa;
     ssize_t siz = sizeof(struct myMsg) - sizeof(long);
     mossa.mtype = 1;
     mossa.posRiga = 0;
     mossa.posColonna = 0;
     
-
     //------------------------- CREAZIONE MEMEORIA CONDIVISA -------------------------//
 
     //memoria condivisa dove salvo la dimensione delle righe e delle colonne e una variabile per determinare il vincitore
     int shmid = alloc_shared_memory(shmKey, sizeof(struct Shared));
-    struct Shared *shared = (struct Shared *)get_shared_memory(shmid, 0);
+    shared = (struct Shared *)get_shared_memory(shmid, 0);
 
     //Memoria condivisa che viene utilizzata come una matrice
     int shmId = shmget(shmKey2, shared->rows * shared->colums * sizeof(char),  IPC_CREAT | S_IRUSR | S_IWUSR);
@@ -133,14 +130,27 @@ int main(int argc, char *argv[]) {
         shared->vincitore = 1;
     }
 
+    //Mando il pid al server
+    mossa.pidClient = getpid();
+    msgSnd(msqid, &mossa, siz, 0);
+
     //Avviso il server che il client é arrivato
     semOp(semid, 0, 1);
     //Attendo il via del server
     semOp(semid, 1, -1);
-    
+
+    //Comunico i gettoni ai client
+    shared->gettoneInizio ++;
+    if(shared->gettoneInizio == 1){
+        printf("\nGiocherai con il gettone %c", shared->Gettone1);
+    }else{
+        printf("Giocherai con il gettore %c", shared->Gettone2);
+    }
+ 
     //Acquisizione Gettoni giocatori dalla memoria condivisa
     Gettone1 = shared->Gettone1;
     Gettone2 = shared->Gettone2;
+    //Inizializzo nuovamente la variabile vincitore perchè è stata usata per comunicare al server se si gioca in autoGame o no
     shared->vincitore = 0;
 
 
@@ -151,7 +161,6 @@ int main(int argc, char *argv[]) {
     if(signal(SIGINT, sigHandler) == SIG_ERR)
         errExit("change signal handler failed");
 
-
     //------------------------- GESTIONE DEL GIOCO -------------------------//
     int fine = 1; 
     while(fine == 1){
@@ -159,7 +168,7 @@ int main(int argc, char *argv[]) {
         //Se nessuno ha ancora vinto o pareggiato continuo
         if(shared->vincitore == 1){
             stampa(&matrix[0][0], shared->rows, shared->colums);
-            printf("\n Hai perso!!\n"); 
+            printf("\nHai perso!!\n"); 
             break;
         }
         if(shared->vincitore == 2){
@@ -168,9 +177,11 @@ int main(int argc, char *argv[]) {
             break;
         }
         if(shared->vincitore == 3){
-            printf("\nIl gioco é stato terminato dall'esterno\n");
+            printf("\nVittoria per abbandono\n");
+            //mossa.posRiga = -1;
+            //mossa.posColonna = -1;
+            msgSnd(msqid, &mossa, siz, 0);
             break;
-            //exit(0);
         }
         stampa(&matrix[0][0], shared->rows, shared->colums);
         
@@ -189,15 +200,19 @@ int main(int argc, char *argv[]) {
                 rigaValida = inserisci(&matrix[0][0], shared->rows, colonna);
             }
             //Mando la posizione del gettone al server
-            mossa.posRiga = rigaValida;
-            mossa.posColonna = colonna;
-            if(msgsnd(msqid, &mossa, siz, 0) == -1){
-                errExit("msgsnd failed\n");
+            if(shared->vincitore == 3 || shared->vincitore == 4){
+                mossa.posRiga = -1;
+                mossa.posColonna = -1;
+            }else{
+                mossa.posRiga = rigaValida;
+                mossa.posColonna = colonna;
             }
+            //Invio messaggio (CONTROLLARE)
+            msgSnd(msqid, &mossa, siz, 0);
         }else{
             //Giocatore normale
             do{
-                alarm(30); //Setto un timer di 30 secondi   
+                alarm(10); //Setto un timer di 30 secondi   
                 printf("\nGiocatore %s inserisci la colonna:  ", argv[1]);
                 fgets(buffer, sizeof(buffer), stdin);
                 alarm(0); //Disattivo il timer
@@ -215,9 +230,7 @@ int main(int argc, char *argv[]) {
                     //Invio al server dove deve mettere il gettone attraverso la coda dei messaggi
                     mossa.posRiga = rigaValida;
                     mossa.posColonna = colonna;
-                    if(msgsnd(msqid, &mossa, siz, 0) == -1){
-                        errExit("msgsnd failed\n");
-                    }
+                    msgSnd(msqid, &mossa, siz, 0);
                     okriga = 0;
                 }else {
                     //Se la colonna è piena ne chiedo una nuova
@@ -242,11 +255,9 @@ int main(int argc, char *argv[]) {
             printf("\nPareggio\n");
             fine = 0;
          }
-         //Controllo se il gioco è stato terminato dall'esterno
-         if(shared->vincitore == 3){
-            printf("\nIl gioco é stato terminato dall'esterno\n");
+         //Controllo se vincitore è a 3 allora vuol dire che è scaduto il timer per l' inserimento della mossa
+        if(shared->vincitore == 3){
             break;
-            //exit(0);
         }
         if(autoGameSignal == 1)
             semOp(semid, 3, -1);
@@ -317,14 +328,20 @@ int inserisci(char *m, int r, int c){
 
 //Gestione del segnale alarm
 void quit(int sig){
-    printf("\nTempo scaduto!!");
-    exit(1);
+    if(shared->vincitore != 4){
+        printf("\nTempo scaduto!!\n");
+    }
+    shared->vincitore = 3;
+    semOp(semid, 2, 1);
+    semOp(semid, 0, 1);
+    exit(0);
 }
 
 void sigHandler(int sig){
-    contaSegnale++;
-    printf("\nSicuro di voler abbandonare?\n");
-    if(contaSegnale == 2)
-        exit(0);
+    if(shared->vincitore == -1)
+        printf("\nIl gioco é stato terminato dall'esterno");
+    shared->vincitore = 4;
+    quit(SIGALRM);
+    exit(0);
 }
 
