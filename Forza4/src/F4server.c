@@ -33,7 +33,7 @@ int shmId = 0;
 int *sharedMemory;
 pid_t pidClient1 = 0;
 pid_t pidClient2 = 0;
-
+int msqid = -1; 
 
 //------------------------- FUNZIONE PER LA CREAZIONE DI UN SET DI SEMAFORI -------------------------//
 int create_sem_set(key_t semkey) {
@@ -53,9 +53,6 @@ int create_sem_set(key_t semkey) {
     return semid;
 }
 
-//Inizializzazione msqid
-int msqid = -1; 
-
 int main(int argc, char *argv[]) {
 
     //Key
@@ -66,12 +63,12 @@ int main(int argc, char *argv[]) {
 
     //set di segnali
     sigset_t mySet;
-    
     //Iniziallizzazio di mySet con tutti i segnali
     sigfillset(&mySet);
-    //Rimozione del segnale SIGINT da mySet
+    //Rimozione del segnale SIGINT, SIGALARM da mySet
     sigdelset(&mySet, SIGINT);
-    // blocking all signals but SIGINT
+    sigdelset(&mySet, SIGALRM);
+    //blocco tutti gli altri segnali su mySet
     sigprocmask(SIG_SETMASK, &mySet, NULL);
 
 
@@ -126,6 +123,8 @@ int main(int argc, char *argv[]) {
     if(signal(SIGINT, sigHandler) == SIG_ERR)
         errExit("change signal handler failed");
 
+    if(signal(SIGALRM, sigTimer) == SIG_ERR)
+        errExit("change signal handler failed");
 
     //------------------------- IL SERVER ASPETTA I CLIENT -------------------------//
 
@@ -136,7 +135,6 @@ int main(int argc, char *argv[]) {
     //Acquisisco il pid del primo client
     msgRcv(msqid, &mossa, siz, 0, 0);
     pidClient1 = mossa.pidClient;
-
 
     //Aspetto che i client mi dicano se devo giocare in modalitá automaticGame
     int autoGame = shared->vincitore;
@@ -161,7 +159,7 @@ int main(int argc, char *argv[]) {
     }
 
     //Attesa secondo client
-    semOp(semid, 0, -1); //Attesa secondo client
+    semOp(semid, 0, -1); 
     printf("\n<Server> Client 2 arrivato\n");
 
     //Acquisisco il pid del secondo client
@@ -183,7 +181,7 @@ int main(int argc, char *argv[]) {
 
     printf("\n<Server> Campo di gioco pronto, gioco in corso\n");
 
-    //Il server fa partire i client che stampano il campo da gioco
+    //Il server fa partire i client
     semOp(semid, 1, 1);
     semOp(semid, 1, 1);
     
@@ -205,7 +203,7 @@ int main(int argc, char *argv[]) {
                 matrix[mossa.posRiga][mossa.posColonna] = Gettone2; //Inserimento gettone nella matrice
             }
 
-            //CONTROLLO VITTORIA CON FUNZIONE
+            //CONTROLLO VITTORIA
             if(controlloVittoria(&matrix[0][0], shared->rows, shared->colums, Gettone1, Gettone2, mossa.posColonna) == 1){
                 shared->vincitore = 1;
                 fine = 0;
@@ -269,13 +267,17 @@ int controlloVittoria(char *m,int rows, int columns, char Gettone1, char Gettone
         if( *(m + i * columns + posColonna) == Gettone1 && *(m + (i + 1) * columns + posColonna) == Gettone1){
             verticale1++;
         }
-        if( *(m + i * columns + posColonna) == Gettone2 && *(m + (i + 1) * columns + posColonna)== Gettone2){
+        if( *(m + i * columns + posColonna) == Gettone2 && *(m + (i + 1) * columns + posColonna) == Gettone2){
             verticale2++;
         }
+        if( (*(m + i * columns + posColonna) == Gettone1 && *(m + (i + 1) * columns + posColonna) == Gettone2) || (*(m + i * columns + posColonna) == Gettone2 && *(m + (i + 1) * columns + posColonna) == Gettone1)){
+            verticale2 = 0;
+            verticale1 = 0;
+        }
+        if(verticale1 == 3 || verticale2 == 3)
+            return 1;
     }
-    if(verticale1 == 3 || verticale2 == 3)
-        return 1;
-
+    
     //Controllo orizzontale
     for(int i = 0; i < rows; i++){
         for(int j = 0; j < columns; j++){

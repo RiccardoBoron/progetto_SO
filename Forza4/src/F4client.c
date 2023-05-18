@@ -27,7 +27,6 @@ void quit(int sig);
 void sigHandler(int sig);
 
 
-
 //------------------------- FUNZIONE PER LA CREAZIONE DI UN SET DI SEMAFORI -------------------------//
 int create_sem_set(key_t semkey) {
     //Creazione di un set di 4 semafori
@@ -49,9 +48,6 @@ int create_sem_set(key_t semkey) {
 //Inizializzazione msqid
 int msqid = -1; 
 int semid = 0;
-//Gettoni dei Giocatori
-char Gettone1;
-char Gettone2;
 
 struct Shared *shared;
 
@@ -87,10 +83,10 @@ int main(int argc, char *argv[]) {
     sigset_t mySet;
     //Iniziallizzazio di mySet con tutti i segnali
     sigfillset(&mySet);
-    //Rimozione del segnale SIGINT da mySet
+   //Rimozione del segnale SIGINT, SIGALARM da mySet
     sigdelset(&mySet, SIGINT);
     sigdelset(&mySet, SIGALRM);
-    // blocking all signals but SIGINT
+    //blocco tutti gli altri segnali su mySet
     sigprocmask(SIG_SETMASK, &mySet, NULL);
 
     //Buffer nel quale salvo la posizione che chiedo al client per inserire il gettone
@@ -146,10 +142,7 @@ int main(int argc, char *argv[]) {
     }else{
         printf("Giocherai con il gettore %c", shared->Gettone2);
     }
- 
-    //Acquisizione Gettoni giocatori dalla memoria condivisa
-    Gettone1 = shared->Gettone1;
-    Gettone2 = shared->Gettone2;
+
     //Inizializzo nuovamente la variabile vincitore perchè è stata usata per comunicare al server se si gioca in autoGame o no
     shared->vincitore = 0;
 
@@ -199,15 +192,10 @@ int main(int argc, char *argv[]) {
                 colonna = rand() % (maxNum-0+1)+0;
                 rigaValida = inserisci(&matrix[0][0], shared->rows, colonna);
             }
+
             //Mando la posizione del gettone al server
-            if(shared->vincitore == 3 || shared->vincitore == 4){
-                mossa.posRiga = -1;
-                mossa.posColonna = -1;
-            }else{
-                mossa.posRiga = rigaValida;
-                mossa.posColonna = colonna;
-            }
-            //Invio messaggio (CONTROLLARE)
+            mossa.posRiga = rigaValida;
+            mossa.posColonna = colonna;
             msgSnd(msqid, &mossa, siz, 0);
         }else{
             //Giocatore normale
@@ -247,12 +235,12 @@ int main(int argc, char *argv[]) {
         stampa(&matrix[0][0], shared->rows, shared->colums);
         //Controllo se ce stata una vincita
         if(shared->vincitore == 1){
-            printf("\nHai Vinto !!!\n");
+            printf("\nHai Vinto!!\n");
             fine = 0;
         }
         //Controllo se ce stato un pareggio
         if(shared->vincitore == 2){
-            printf("\nPareggio\n");
+            printf("\nPareggio!!\n");
             fine = 0;
          }
          //Controllo se vincitore è a 3 allora vuol dire che è scaduto il timer per l' inserimento della mossa
@@ -337,6 +325,7 @@ void quit(int sig){
     exit(0);
 }
 
+//Gestione del segnale ctrl+c
 void sigHandler(int sig){
     if(shared->vincitore == -1)
         printf("\nIl gioco é stato terminato dall'esterno");

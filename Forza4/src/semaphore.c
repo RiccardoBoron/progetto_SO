@@ -17,7 +17,7 @@ void semOp(int semid, unsigned short sem_num, short sem_op) {
         if(errno != EINTR){
             errExit("errore acquisizione semaforo");
         }else{
-            continue;
+           //continue
         }
     }
 }
