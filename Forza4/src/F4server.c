@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
     semid = create_sem_set(semKey);
 
     //------------------------- CREAZIONE CODA DEI MESSAGGI -------------------------//
-    int msqid = msgget(msgKey, IPC_CREAT | S_IRUSR | S_IWUSR);
+    msqid = msgget(msgKey, IPC_CREAT | S_IRUSR | S_IWUSR);
     if(msqid == -1){
         errExit("msgget failed\n");
     }
@@ -232,7 +232,7 @@ int main(int argc, char *argv[]) {
     //Aspetto che termini il figlio 
     while(wait(NULL) != -1);
 
-    //------------------------- ELIMINAZIONE SEMAFORI E SHARED MEMORY -------------------------//
+    //------------------------- ELIMINAZIONE SEMAFORI, SHARED MEMORY, MESSAGE QUEUE -------------------------//
     if(semctl(semid, 0, IPC_RMID, NULL) == -1)
         errExit("rimozione set semafori FALLITA!");
 
@@ -244,6 +244,11 @@ int main(int argc, char *argv[]) {
 
     if (shmctl(shmId, IPC_RMID, NULL) == -1)
         errExit("shmctl failed");
+
+
+    if (msgctl(msqid, IPC_RMID, NULL) == -1)
+        errExit("msgctl IPC_RMID failed");
+    
     
     return 0;
 }
@@ -321,6 +326,9 @@ void sigHandler(int sig){
 
         if (shmctl(shmId, IPC_RMID, NULL) == -1)
             errExit("shmctl failed");
+
+        if (msgctl(msqid, IPC_RMID, NULL) == -1)
+            errExit("msgctl IPC_RMID failed");
 
         exit(0);
     }
