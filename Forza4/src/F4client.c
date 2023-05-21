@@ -45,33 +45,35 @@ int create_sem_set(key_t semkey) {
     return semid;
 }
 
-//Inizializzazione msqid
+
 int msqid = -1; 
 int semid = 0;
-
 struct Shared *shared;
 
 int main(int argc, char *argv[]) {
 
-    int automaticGame = 0; //Variabile per far giocare il pc come avversario
+    //Variabili per il giocatore automatico
+    int automaticGame = 0; 
     int autoGameSignal = 0;
+    
     char asterisco[] = "-"; //Capire perchè l' * non va
 
     //Controllo input inseriti da linea di comando
     if(argc < 2 || argc > 3) {
-        printf("\nErrore input: i dati inseriti non sono validi inserire ./client nome_utente\n");
+        printf("\nErrore input: i dati inseriti non sono validi inserire ./F4client nome_utente\n");
         exit(1);
     }
+
     //Controllo se il client vuole giocare con l' avversario automatico
     if(argc == 3 && strcmp(asterisco, argv[2])==0){
         automaticGame = 1;
     }
     
     //Imposto la variabile autoGameSignal a 1 in modo che il client giochi in modo automatico
-    int automatico = atoi(argv[1]);
-    if(automatico == 1){
+    if(argc == 2 && atoi(argv[1]) == 1 && strcmp("giocatore", argv[0]) == 0){
         autoGameSignal = 1;
     }
+
     
     //key
     key_t shmKey = 12; //Memoria condivisa
@@ -83,7 +85,7 @@ int main(int argc, char *argv[]) {
     sigset_t mySet;
     //Iniziallizzazio di mySet con tutti i segnali
     sigfillset(&mySet);
-   //Rimozione del segnale SIGINT, SIGALARM da mySet
+    //Rimozione del segnale SIGINT, SIGALARM da mySet
     sigdelset(&mySet, SIGINT);
     sigdelset(&mySet, SIGALRM);
     //blocco tutti gli altri segnali su mySet
@@ -111,7 +113,7 @@ int main(int argc, char *argv[]) {
     
     //------------------------- CREAZIONE MEMEORIA CONDIVISA -------------------------//
 
-    //memoria condivisa dove salvo la dimensione delle righe e delle colonne e una variabile per determinare il vincitore
+    //Memoria condivisa dove salvo la dimensione delle righe e delle colonne e una variabile per determinare il vincitore
     int shmid = alloc_shared_memory(shmKey, sizeof(struct Shared));
     shared = (struct Shared *)get_shared_memory(shmid, 0);
 
@@ -123,7 +125,7 @@ int main(int argc, char *argv[]) {
     //Avviso il server che gioca in automatico
     //Se la variabile automaticGame è a 1 allora il server deve eseguire la fork e la exec per far giocare un client in modo automatico
     if(automaticGame == 1){
-        shared->vincitore = 1;
+        shared->autoGameFlag = 1;
     }
 
     //Mando il pid al server
@@ -142,10 +144,6 @@ int main(int argc, char *argv[]) {
     }else{
         printf("Giocherai con il gettore %c", shared->Gettone2);
     }
-
-    //Inizializzo nuovamente la variabile vincitore perchè è stata usata per comunicare al server se si gioca in autoGame o no
-    shared->vincitore = 0;
-
 
     //------------------------- GESTIONE DEI SEGNALI ------------------------//
     if(signal(SIGALRM, quit) == SIG_ERR)
@@ -171,8 +169,6 @@ int main(int argc, char *argv[]) {
         }
         if(shared->vincitore == 3){
             printf("\nVittoria per abbandono\n");
-            //mossa.posRiga = -1;
-            //mossa.posColonna = -1;
             msgSnd(msqid, &mossa, siz, 0);
             break;
         }
@@ -200,7 +196,7 @@ int main(int argc, char *argv[]) {
         }else{
             //Giocatore normale
             do{
-                alarm(10); //Setto un timer di 30 secondi   
+                alarm(10); //Setto un timer di 10 secondi   
                 printf("\nGiocatore %s inserisci la colonna:  ", argv[1]);
                 fgets(buffer, sizeof(buffer), stdin);
                 alarm(0); //Disattivo il timer
@@ -305,7 +301,7 @@ int isValidInput(const char *s, int coordinata) {
     }
 }
 
-// Convalida la colonna, se é libera, nel caso restituisce la casella piu bassa libera
+//Convalida la colonna, se é libera, nel caso restituisce la casella piu bassa libera
 int inserisci(char *m, int r, int c){
     int i;
     for(i = r-1; i >= 0; i--)
@@ -327,10 +323,18 @@ void quit(int sig){
 
 //Gestione del segnale ctrl+c
 void sigHandler(int sig){
-    if(shared->vincitore == -1)
+    if(shared->vincitore == -1){
         printf("\nIl gioco é stato terminato dall'esterno");
-    shared->vincitore = 4;
-    quit(SIGALRM);
+    }else{
+        shared->vincitore = 4;
+        quit(SIGALRM);
+    }  
     exit(0);
 }
+
+/************************************** 
+*Matricola: VR471376
+*Nome e cognome: Riccardo Boron
+*Data di realizzazione: 18/05/2023
+*************************************/
 

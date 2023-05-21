@@ -10,12 +10,9 @@ void semOp(int semid, unsigned short sem_num, short sem_op) {
         .sem_flg = 0
     };
 
-    //if(semop(semid, &sop, 1) == -1)
-        //errExit("semop failed");
-
     while(semop(semid, &sop, 1) == -1){
         if(errno != EINTR){
-            errExit("errore acquisizione semaforo");
+            errExit("semop failed");
         }else{
            //continue
         }

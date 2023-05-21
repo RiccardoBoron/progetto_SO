@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
     key_t msgKey = 10; //Coda dei messaggi
     key_t shmKey2 = 34; //Memoria condivisa usata come matrice
 
-    //set di segnali
+    //Set di segnali
     sigset_t mySet;
     //Iniziallizzazio di mySet con tutti i segnali
     sigfillset(&mySet);
@@ -93,13 +93,21 @@ int main(int argc, char *argv[]) {
 
     //------------------------- CREAZIONE MEMEORIA CONDIVISA -------------------------//
     
-    //memoria condivisa dove salvo la dimensione delle righe e delle colonne e una variabile per determinare il vincitore
+    //Memoria condivisa dove salvo la dimensione delle righe e delle colonne e una variabile per determinare il vincitore
     shmid = alloc_shared_memory(shmKey, sizeof(struct Shared));
     shared = (struct Shared*)get_shared_memory(shmid, 0);
 
     //Memoria condivisa che viene utilizzata come una matrice
     shmId = shmget(shmKey2, rows * colums * sizeof(int), IPC_CREAT | S_IRUSR | S_IWUSR);
+    if(shmId == -1){
+        errExit("shmget failed");
+    }
+
     sharedMemory = (int*)shmat(shmId, NULL, 0);
+    if(sharedMemory == (void *)-1){
+        errExit("shmat failed");
+    }
+    
     char(*matrix)[colums] = (char(*)[colums])sharedMemory;
 
 
@@ -137,9 +145,8 @@ int main(int argc, char *argv[]) {
     pidClient1 = mossa.pidClient;
 
     //Aspetto che i client mi dicano se devo giocare in modalitá automaticGame
-    int autoGame = shared->vincitore;
-    shared->vincitore = 0;
-
+    int autoGame = shared->autoGameFlag;
+    
     //Se gioco in autogame il server si duplica ed esegue la parte di client relativa all'autogiocatore
     if(autoGame == 1){
         pid_t pid = fork();
@@ -149,8 +156,8 @@ int main(int argc, char *argv[]) {
             char *args[] = {"giocatore", "1", NULL};
             //Faccio la exec()
             printf("\nDuplicazione server\n");
-            if(execv("./client", args) == -1){
-                errExit("execv");
+            if(execv("./F4client", args) == -1){
+                errExit("execv failed");
             }
             while(shared->vincitore == 0);
             printf("Figlio terminato");
@@ -179,7 +186,7 @@ int main(int argc, char *argv[]) {
     //Inizializzazione della matrice (tutta vuota all'inizio)
     azzera(&matrix[0][0], rows, colums);
 
-    printf("\n<Server> Campo di gioco pronto, gioco in corso\n");
+    printf("\n<Server> Campo di gioco pronto, gioco in corso...\n");
 
     //Il server fa partire i client
     semOp(semid, 1, 1);
@@ -223,7 +230,7 @@ int main(int argc, char *argv[]) {
     } 
     
     //Aspetto la terminazione dei client per eliminare semafori e shared memeory
-    printf("<Server> Aspetto che i Client terminino\n"); 
+    printf("<Server> Aspetto che i Client terminino...\n"); 
     semOp(semid, 0, -1); 
     printf("<Server> Client 1 terminato, aspetto per Client 2 \n"); 
     semOp(semid, 0, -1);
@@ -234,7 +241,7 @@ int main(int argc, char *argv[]) {
 
     //------------------------- ELIMINAZIONE SEMAFORI, SHARED MEMORY, MESSAGE QUEUE -------------------------//
     if(semctl(semid, 0, IPC_RMID, NULL) == -1)
-        errExit("rimozione set semafori FALLITA!");
+        errExit("smctl failed\n");
 
     free_shared_memory(shared);
     remove_shared_memory(shmid);
@@ -253,7 +260,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-//Inizializza il campo da gioco
+//Funzione di inizializza il campo da gioco
 void azzera(char *m, int r, int c){
     int i,j;
     for(i=0; i<r; i++)
@@ -261,7 +268,7 @@ void azzera(char *m, int r, int c){
           *(m + i * c + j) = ' ';
 }
 
-//Controllo vittoria
+//Funzione di controllo vittoria
 int controlloVittoria(char *m,int rows, int columns, char Gettone1, char Gettone2, int posColonna){
     //Variabili per verificare la vittoria
     int verticale1 = 0, verticale2 = 0;
@@ -302,7 +309,7 @@ int controlloVittoria(char *m,int rows, int columns, char Gettone1, char Gettone
     return 0;
 }
 
-//Gestione del segnale Ctrl^C
+//Funzion di gestione del segnale Ctrl+C
 void sigHandler(int sig){
     contaSegnale ++;
     if(contaSegnale == 1) {
@@ -315,7 +322,7 @@ void sigHandler(int sig){
         kill(pidClient2, SIGINT);
 
         if(semctl(semid, 0, IPC_RMID, NULL) == -1)
-            errExit("rimozione set semafori FALLITA!");
+            errExit("smctl failed\n");
 
         free_shared_memory(shared);
 
@@ -340,7 +347,11 @@ void sigTimer(int sig){
 }
 
 
-
+/************************************** 
+*Matricola: VR471376
+*Nome e cognome: Riccardo Boron
+*Data di realizzazione: 18/05/2023
+*************************************/
 
 
 
