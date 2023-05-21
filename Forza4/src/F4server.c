@@ -318,8 +318,13 @@ void sigHandler(int sig){
     }
     if(contaSegnale == 2){
         shared->vincitore = -1;
-        kill(pidClient1, SIGINT);
-        kill(pidClient2, SIGINT);
+        if(kill(pidClient1, SIGINT) == -1){
+            errExit("kill failed");
+        }
+
+        if(kill(pidClient2, SIGINT)){
+            errExit("kill failed");
+        }
 
         if(semctl(semid, 0, IPC_RMID, NULL) == -1)
             errExit("smctl failed\n");
