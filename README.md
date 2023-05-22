@@ -12,6 +12,6 @@ Forza4 game implementation with IPC
 
 # How to run autoPlayer
 - ./server field_size X O
-- ./client player1_name -
+- ./client player1_name \*
 
 
