@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
     int automaticGame = 0; 
     int autoGameSignal = 0;
     
-    char asterisco[] = "-"; //Capire perchè l' * non va
+    char asterisco[] = "*";
 
     //Controllo input inseriti da linea di comando
     if(argc < 2 || argc > 3) {
@@ -332,9 +332,5 @@ void sigHandler(int sig){
     exit(0);
 }
 
-/************************************** 
-*Matricola: VR471376
-*Nome e cognome: Riccardo Boron
-*Data di realizzazione: 18/05/2023
-*************************************/
+
 

@@ -352,11 +352,8 @@ void sigTimer(int sig){
 }
 
 
-/************************************** 
-*Matricola: VR471376
-*Nome e cognome: Riccardo Boron
-*Data di realizzazione: 18/05/2023
-*************************************/
+
+
 
 
 
