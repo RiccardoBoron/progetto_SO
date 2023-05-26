@@ -20,7 +20,7 @@
 
 //------------------------- PROTOTIPI DI FUNZIONI -------------------------//
 void stampa(char *m, int, int);
-void stampaRigaPiena(int c);
+void stampaRiga(int c);
 int isValidInput(const char*, int); 
 int inserisci(char *m, int, int);
 void quit(int sig);
@@ -103,8 +103,6 @@ int main(int argc, char *argv[]) {
         errExit("msgget failed\n");
     }
 
-    //Struttura condivisa con coda dei messaggi, viene utilizzata per inserire il gettone nella posizione giusta
-   
     struct myMsg mossa;
     ssize_t siz = sizeof(struct myMsg) - sizeof(long);
     mossa.mtype = 1;
@@ -139,12 +137,14 @@ int main(int argc, char *argv[]) {
 
     //Comunico i gettoni ai client
     shared->gettoneInizio ++;
-    if(shared->gettoneInizio == 1){
-        printf("\nGiocherai con il gettone %c", shared->Gettone1);
-    }else{
-        printf("Giocherai con il gettore %c", shared->Gettone2);
+    if(autoGameSignal != 1){
+        if(shared->gettoneInizio == 1){
+            printf("\nGiocherai con il gettone %c", shared->Gettone1);
+        }else{
+            printf("Giocherai con il gettore %c", shared->Gettone2);
+        }
     }
-
+    
     //------------------------- GESTIONE DEI SEGNALI ------------------------//
     if(signal(SIGALRM, quit) == SIG_ERR)
         errExit("change signal handler failed");
@@ -158,22 +158,30 @@ int main(int argc, char *argv[]) {
         semOp(semid, 2, -1);
         //Se nessuno ha ancora vinto o pareggiato continuo
         if(shared->vincitore == 1){
-            stampa(&matrix[0][0], shared->rows, shared->colums);
-            printf("\nHai perso!!\n"); 
+            if(autoGameSignal != 1){
+                stampa(&matrix[0][0], shared->rows, shared->colums);
+                printf("\nHai perso!!\n"); 
+            }
             break;
         }
         if(shared->vincitore == 2){
-            stampa(&matrix[0][0], shared->rows, shared->colums);
-            printf("\nPareggio!!\n");
+            if(autoGameSignal != 1){
+                stampa(&matrix[0][0], shared->rows, shared->colums);
+                printf("\nPareggio!!\n");
+            }
             break;
         }
         if(shared->vincitore == 3){
-            printf("\nVittoria per abbandono\n");
+            if(autoGameSignal != 1){
+                printf("\nVittoria per abbandono\n");
+            }
             msgSnd(msqid, &mossa, siz, 0);
             break;
         }
-        stampa(&matrix[0][0], shared->rows, shared->colums);
-        
+        if(autoGameSignal != 1){
+            stampa(&matrix[0][0], shared->rows, shared->colums);
+        }
+
         int colonna = 0;
 
         //Giocatore automatico genera numeri random e manda la posizione dove inserire il gettone al server
@@ -228,15 +236,22 @@ int main(int argc, char *argv[]) {
         }
         semOp(semid, 1, -1);
         
-        stampa(&matrix[0][0], shared->rows, shared->colums);
+        if(autoGameSignal != 1){
+            stampa(&matrix[0][0], shared->rows, shared->colums);
+        }
+        
         //Controllo se ce stata una vincita
         if(shared->vincitore == 1){
-            printf("\nHai Vinto!!\n");
+            if(autoGameSignal != 1){
+                printf("\nHai Vinto!!\n");
+            }
             fine = 0;
         }
         //Controllo se ce stato un pareggio
         if(shared->vincitore == 2){
-            printf("\nPareggio!!\n");
+            if(autoGameSignal != 1){
+                printf("\nPareggio!!\n");
+            }
             fine = 0;
          }
          //Controllo se vincitore è a 3 allora vuol dire che è scaduto il timer per l' inserimento della mossa
@@ -257,16 +272,16 @@ int main(int argc, char *argv[]) {
 void stampa(char *m, int r, int c) {
     int i,j;
     printf("\n");
-    stampaRigaPiena(c);  
+    stampaRiga(c);  
      
     for(i = 0; i < r; i++){ 
         printf("   |");
         for(j = 0; j < c; j++)
             printf(" %c |", *(m + i * c + j));
         printf("\n");
-        stampaRigaPiena(c);
+        stampaRiga(c);
     }
-    stampaRigaPiena(c);  
+    stampaRiga(c);  
     printf("   |");
     for(j = 0; j < c; j++){
         if(j >= 10){
@@ -276,12 +291,11 @@ void stampa(char *m, int r, int c) {
         }
     }
     printf("\n");
-    stampaRigaPiena(c); 
+    stampaRiga(c); 
     printf("\n");
 }
 
-//Stampa di una riga |---|---|--...
-void stampaRigaPiena(int c) {
+void stampaRiga(int c) {
     int j;
     printf("   |");
     for(j = 1; j <= c; j++)
@@ -332,5 +346,8 @@ void sigHandler(int sig){
     exit(0);
 }
 
-
-
+/************************************** 
+*Matricola: VR471376
+*Nome e cognome: Riccardo Boron
+*Data di realizzazione: 18/05/2023
+*************************************/

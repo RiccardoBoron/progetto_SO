@@ -120,7 +120,6 @@ int main(int argc, char *argv[]) {
         errExit("msgget failed\n");
     }
 
-    //Struttura condivisa con coda dei messaggi, viene utilizzata per inserire il gettone nella posizione giusta
     struct myMsg mossa;
     ssize_t siz = sizeof(struct myMsg) - sizeof(long);
     mossa.mtype = 1;
@@ -155,12 +154,11 @@ int main(int argc, char *argv[]) {
         }else if(pid == 0){
             char *args[] = {"giocatore", "1", NULL};
             //Faccio la exec()
-            printf("\nDuplicazione server\n");
+            printf("\n<Server> Duplicazione server ed esecuzione client automatico...\n");
             if(execv("./F4client", args) == -1){
                 errExit("execv failed");
             }
             while(shared->vincitore == 0);
-            printf("Figlio terminato");
             exit(0);
         }
     }
@@ -174,7 +172,7 @@ int main(int argc, char *argv[]) {
     pidClient2 = mossa.pidClient;
     
     //------------------------- INIZIALIZZAZIONE CAMPO DI GIOCO -------------------------//
-    printf("\n<Server> Preparo il campo di gioco\n");
+    printf("\n<Server> Preparo il campo di gioco...\n");
 
     //Inserimento delle righe e colonne nella memoria condivisa
     shared->rows = rows;
@@ -352,15 +350,8 @@ void sigTimer(int sig){
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
+/************************************** 
+*Matricola: VR471376
+*Nome e cognome: Riccardo Boron
+*Data di realizzazione: 18/05/2023
+*************************************/
