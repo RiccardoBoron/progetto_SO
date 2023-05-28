@@ -204,7 +204,7 @@ int main(int argc, char *argv[]) {
         }else{
             //Giocatore normale
             do{
-                alarm(10); //Setto un timer di 10 secondi   
+                alarm(30); //Setto un timer di 30 secondi   
                 printf("\nGiocatore %s inserisci la colonna:  ", argv[1]);
                 fgets(buffer, sizeof(buffer), stdin);
                 alarm(0); //Disattivo il timer
@@ -256,6 +256,9 @@ int main(int argc, char *argv[]) {
          }
          //Controllo se vincitore è a 3 allora vuol dire che è scaduto il timer per l' inserimento della mossa
         if(shared->vincitore == 3){
+            if(autoGameSignal != 1){
+                printf("\nVittoria per abbandono\n");
+            }
             break;
         }
         if(autoGameSignal == 1)
@@ -332,6 +335,8 @@ void quit(int sig){
     shared->vincitore = 3;
     semOp(semid, 2, 1);
     semOp(semid, 0, 1);
+    //Se termina il giocatore al quale non é concesso il turno sblocco il giocatore che sta inserendo e termina
+    semOp(semid, 1, 1);
     exit(0);
 }
 
