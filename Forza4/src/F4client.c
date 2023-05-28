@@ -49,6 +49,8 @@ int create_sem_set(key_t semkey) {
 int msqid = -1; 
 int semid = 0;
 struct Shared *shared;
+struct myMsg mossa;
+ssize_t siz = sizeof(struct myMsg) - sizeof(long);
 
 int main(int argc, char *argv[]) {
 
@@ -103,8 +105,8 @@ int main(int argc, char *argv[]) {
         errExit("msgget failed\n");
     }
 
-    struct myMsg mossa;
-    ssize_t siz = sizeof(struct myMsg) - sizeof(long);
+    //struct myMsg mossa;
+    //ssize_t siz = sizeof(struct myMsg) - sizeof(long);
     mossa.mtype = 1;
     mossa.posRiga = 0;
     mossa.posColonna = 0;
@@ -204,7 +206,7 @@ int main(int argc, char *argv[]) {
         }else{
             //Giocatore normale
             do{
-                alarm(30); //Setto un timer di 30 secondi   
+                alarm(10); //Setto un timer di 30 secondi   
                 printf("\nGiocatore %s inserisci la colonna:  ", argv[1]);
                 fgets(buffer, sizeof(buffer), stdin);
                 alarm(0); //Disattivo il timer
@@ -331,6 +333,8 @@ int inserisci(char *m, int r, int c){
 void quit(int sig){
     if(shared->vincitore != 4){
         printf("\nTempo scaduto!!\n");
+        //Nel caso terminasse un giocatore fuori dal turno, altrimenti il server resterebbe bloccato nella ricezione del messaggio
+        msgSnd(msqid, &mossa, siz, 0); 
     }
     shared->vincitore = 3;
     semOp(semid, 2, 1);
