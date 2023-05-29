@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <sys/ipc.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -323,11 +324,21 @@ int isValidInput(const char *s, int coordinata) {
 //Convalida la colonna, se é libera, nel caso restituisce la casella piu bassa libera
 int inserisci(char *m, int r, int c){
     int i;
-    for(i = r-1; i >= 0; i--)
-        if(*(m + i * r + c) == ' ')
-          return i;
-    return -1;
-}
+    int colonne = shared->colums;
+    if(r == colonne){
+        for(i = r-1; i >= 0; i--)
+            if(*(m + i * r + c) == ' '){
+                return i;
+            }       
+        return -1;
+    }else{
+        for(i = r-1; i >= 0; i--)
+            if(*(m + i * colonne + c) == ' '){
+                return i;
+            }       
+        return -1;
+    }
+}   
 
 //Gestione del segnale alarm
 void quit(int sig){
