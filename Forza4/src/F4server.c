@@ -24,6 +24,8 @@ void azzera(char *m, int, int);
 int controlloVittoria(char *m, int rows, int columns, char Gettone1, char Gettone2, int posColonna);
 void sigHandler(int sig);
 void sigTimer(int sig);
+void quitCtrlClient(int sig);
+void remove_msq();
 
 //Variabili globali
 int contaSegnale = 0;
@@ -66,9 +68,10 @@ int main(int argc, char *argv[]) {
     sigset_t mySet;
     //Iniziallizzazio di mySet con tutti i segnali
     sigfillset(&mySet);
-    //Rimozione del segnale SIGINT, SIGALARM da mySet
+    //Rimozione del segnale SIGINT, SIGALARM, SIGUSR2 da mySet
     sigdelset(&mySet, SIGINT);
     sigdelset(&mySet, SIGALRM);
+    sigdelset(&mySet, SIGUSR2);
     //blocco tutti gli altri segnali su mySet
     sigprocmask(SIG_SETMASK, &mySet, NULL);
 
@@ -90,7 +93,6 @@ int main(int argc, char *argv[]) {
     //Acquisizione dei due gettoni di gioco 
     char Gettone1 = *argv[3];
     char Gettone2 = *argv[4];
-
 
     //------------------------- CREAZIONE MEMEORIA CONDIVISA -------------------------//
     
@@ -134,6 +136,10 @@ int main(int argc, char *argv[]) {
     if(signal(SIGALRM, sigTimer) == SIG_ERR)
         errExit("change signal handler failed");
 
+
+    if(signal(SIGUSR2, quitCtrlClient) == SIG_ERR)
+        errExit("change signal handler failed");
+
     //------------------------- IL SERVER ASPETTA I CLIENT -------------------------//
 
     printf("\n<Servre> Aspetto i client...\n");
@@ -172,6 +178,9 @@ int main(int argc, char *argv[]) {
     msgRcv(msqid, &mossa, siz, 0, 0);
     pidClient2 = mossa.pidClient;
     
+    //Acquisiszione pid del server
+    shared->pidServer = getpid();
+
     //------------------------- INIZIALIZZAZIONE CAMPO DI GIOCO -------------------------//
     printf("\n<Server> Preparo il campo di gioco...\n");
 
@@ -239,23 +248,8 @@ int main(int argc, char *argv[]) {
     while(wait(NULL) != -1);
 
     //------------------------- ELIMINAZIONE SEMAFORI, SHARED MEMORY, MESSAGE QUEUE -------------------------//
-    if(semctl(semid, 0, IPC_RMID, NULL) == -1)
-        errExit("smctl failed\n");
+    remove_msq();
 
-    free_shared_memory(shared);
-    remove_shared_memory(shmid);
-
-    if (shmdt(sharedMemory) == -1)
-        errExit("shmdt failed\n"); 
-
-    if (shmctl(shmId, IPC_RMID, NULL) == -1)
-        errExit("shmctl failed");
-
-
-    if (msgctl(msqid, IPC_RMID, NULL) == -1)
-        errExit("msgctl IPC_RMID failed");
-    
-    
     return 0;
 }
 
@@ -325,34 +319,61 @@ void sigHandler(int sig){
             errExit("kill failed");
         }
 
-        if(semctl(semid, 0, IPC_RMID, NULL) == -1)
-            errExit("smctl failed\n");
-
-        free_shared_memory(shared);
-
-        remove_shared_memory(shmid);
-
-        if (shmdt(sharedMemory) == -1)
-            errExit("shmdt failed\n"); 
-
-        if (shmctl(shmId, IPC_RMID, NULL) == -1)
-            errExit("shmctl failed");
-
-        if (msgctl(msqid, IPC_RMID, NULL) == -1)
-            errExit("msgctl IPC_RMID failed");
-
+        remove_msq();
         exit(0);
     }
 }
 
+//Ripristina il gioco se entro 5 secondi non si ripreme Ctrl+C (SIGALARM)
 void sigTimer(int sig){
     printf("Riprendo il gioco\n");
     contaSegnale = 0;
+}
+
+//Nel caso il client termina con Ctrl+C
+void quitCtrlClient(int sig){
+    printf("\nPartita terminata da un Client\n");
+    if(pidClient1 != shared->pidServer){
+        if(kill(pidClient1, SIGUSR1) == -1){
+            errExit("kill failed");
+        }
+    }else if(pidClient2 != shared->pidServer){
+        if(kill(pidClient2, SIGUSR1) == -1){
+            errExit("kill failed");
+        }
+    }
+
+    remove_msq();
+    exit(0);
+}
+
+//FUNZIONE DI ELIMINAZIONE SEMAFORI, SHARED MEMORY, MESSAGE QUEUE 
+void remove_msq(){
+    if(semctl(semid, 0, IPC_RMID, NULL) == -1)
+        errExit("smctl failed\n");
+
+    free_shared_memory(shared);
+
+    remove_shared_memory(shmid);
+
+    if(shmdt(sharedMemory) == -1)
+        errExit("shmdt failed\n"); 
+
+    if(shmctl(shmId, IPC_RMID, NULL) == -1)
+        errExit("shmctl failed");
+
+    if(msgctl(msqid, IPC_RMID, NULL) == -1)
+        errExit("msgctl IPC_RMID failed");
 }
 
 
 /************************************** 
 *Matricola: VR471376
 *Nome e cognome: Riccardo Boron
+*Matricola: 
+*Nome e cognome: 
+*Matricola: 
+*Nome e cognome: 
 *Data di realizzazione: 18/05/2023
 *************************************/
+

@@ -16,6 +16,7 @@ struct Shared {
     int gettoneInizio;
     int vincitore;
     int autoGameFlag;
+    pid_t pidServer;
 };
 
 int alloc_shared_memory(key_t shmKey, size_t size);

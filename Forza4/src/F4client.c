@@ -24,8 +24,10 @@ void stampa(char *m, int, int);
 void stampaRiga(int c);
 int isValidInput(const char*, int); 
 int inserisci(char *m, int, int);
-void quit(int sig);
+void sigAlarm(int sig);
 void sigHandler(int sig);
+void quitCtrl();
+void quitCtrlClient(int sig);
 
 
 //------------------------- FUNZIONE PER LA CREAZIONE DI UN SET DI SEMAFORI -------------------------//
@@ -88,9 +90,10 @@ int main(int argc, char *argv[]) {
     sigset_t mySet;
     //Iniziallizzazio di mySet con tutti i segnali
     sigfillset(&mySet);
-    //Rimozione del segnale SIGINT, SIGALARM da mySet
+    //Rimozione del segnale SIGINT, SIGALARM, SIGUSR1 da mySet
     sigdelset(&mySet, SIGINT);
     sigdelset(&mySet, SIGALRM);
+    sigdelset(&mySet, SIGUSR1);
     //blocco tutti gli altri segnali su mySet
     sigprocmask(SIG_SETMASK, &mySet, NULL);
 
@@ -149,10 +152,13 @@ int main(int argc, char *argv[]) {
     }
     
     //------------------------- GESTIONE DEI SEGNALI ------------------------//
-    if(signal(SIGALRM, quit) == SIG_ERR)
+    if(signal(SIGALRM, sigAlarm) == SIG_ERR)
         errExit("change signal handler failed");
 
     if(signal(SIGINT, sigHandler) == SIG_ERR)
+        errExit("change signal handler failed");
+
+    if(signal(SIGUSR1, quitCtrlClient) == SIG_ERR)
         errExit("change signal handler failed");
 
     //------------------------- GESTIONE DEL GIOCO -------------------------//
@@ -257,13 +263,15 @@ int main(int argc, char *argv[]) {
             }
             fine = 0;
          }
-         //Controllo se vincitore è a 3 allora vuol dire che è scaduto il timer per l' inserimento della mossa
+
+        //Controllo se vincitore è a 3 allora vuol dire che è scaduto il timer per l' inserimento della mossa
         if(shared->vincitore == 3){
             if(autoGameSignal != 1){
                 printf("\nVittoria per abbandono\n");
             }
             break;
         }
+
         if(autoGameSignal == 1)
             semOp(semid, 3, -1);
     }
@@ -341,12 +349,10 @@ int inserisci(char *m, int r, int c){
 }   
 
 //Gestione del segnale alarm
-void quit(int sig){
-    if(shared->vincitore != 4){
-        printf("\nTempo scaduto!!\n");
-        //Nel caso terminasse un giocatore fuori dal turno, altrimenti il server resterebbe bloccato nella ricezione del messaggio
-        msgSnd(msqid, &mossa, siz, 0); 
-    }
+void sigAlarm(int sig){
+    printf("\nTempo scaduto!!\n");
+    //Nel caso terminasse un giocatore fuori dal turno, altrimenti il server resterebbe bloccato nella ricezione del messaggio
+    msgSnd(msqid, &mossa, siz, 0); 
     shared->vincitore = 3;
     semOp(semid, 2, 1);
     semOp(semid, 0, 1);
@@ -359,15 +365,30 @@ void quit(int sig){
 void sigHandler(int sig){
     if(shared->vincitore == -1){
         printf("\nIl gioco é stato terminato dall'esterno");
+        exit(0);
     }else{
-        shared->vincitore = 4;
-        quit(SIGALRM);
-    }  
+        quitCtrl();
+    }
+}
+
+void quitCtrl(){
+    pid_t pidServer = shared->pidServer;
+    shared->pidServer = getpid();
+    kill(pidServer, SIGUSR2);
+    exit(0);
+}
+
+void quitCtrlClient(int sig){
+    printf("\nVittoria per abbandono\n");
     exit(0);
 }
 
 /************************************** 
 *Matricola: VR471376
 *Nome e cognome: Riccardo Boron
+*Matricola: 
+*Nome e cognome: 
+*Matricola: 
+*Nome e cognome: 
 *Data di realizzazione: 18/05/2023
 *************************************/
