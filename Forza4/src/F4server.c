@@ -94,6 +94,12 @@ int main(int argc, char *argv[]) {
     char Gettone1 = *argv[3];
     char Gettone2 = *argv[4];
 
+    //Controllo dei gettoni
+    if(Gettone1 == Gettone2){
+        printf("\nErrore Gettoni: gettoni non possono essere uguali\n");
+        exit(1);
+    }
+
     //------------------------- CREAZIONE MEMEORIA CONDIVISA -------------------------//
     
     //Memoria condivisa dove salvo la dimensione delle righe e delle colonne e una variabile per determinare il vincitore
@@ -370,10 +376,13 @@ void remove_msq(){
 /************************************** 
 *Matricola: VR471376
 *Nome e cognome: Riccardo Boron
+
 *Matricola: 
 *Nome e cognome: 
+
 *Matricola: 
 *Nome e cognome: 
+
 *Data di realizzazione: 18/05/2023
 *************************************/
 

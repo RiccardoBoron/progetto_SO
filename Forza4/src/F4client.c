@@ -371,13 +371,15 @@ void sigHandler(int sig){
     }
 }
 
+//Avviso il server con il segnale di SIGUSR2 che un client ha abbandonato la partita
 void quitCtrl(){
     pid_t pidServer = shared->pidServer;
-    shared->pidServer = getpid();
+    shared->pidServer = getpid(); //Sostituisco pidSerever con il pid del client che ha terminato
     kill(pidServer, SIGUSR2);
     exit(0);
 }
 
+//Gestione del segnare SIGUSR1
 void quitCtrlClient(int sig){
     printf("\nVittoria per abbandono\n");
     exit(0);
@@ -386,9 +388,12 @@ void quitCtrlClient(int sig){
 /************************************** 
 *Matricola: VR471376
 *Nome e cognome: Riccardo Boron
+
 *Matricola: 
 *Nome e cognome: 
+
 *Matricola: 
 *Nome e cognome: 
+
 *Data di realizzazione: 18/05/2023
 *************************************/
