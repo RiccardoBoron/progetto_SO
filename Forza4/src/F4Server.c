@@ -298,6 +298,14 @@ int controlloVittoria(char *m,int rows, int columns, char Gettone1, char Gettone
             if( *(m + i * columns + j) == Gettone2 && *(m + i * columns + j + 1) == Gettone2){
                 orizzontale2++;
             }
+            
+            if(orizzontale1 == 3 || orizzontale2 == 3)
+                return 1;
+
+            if( (*(m + i * columns + j) == Gettone1 && *(m + i * columns + j + 1) != Gettone1) ||  (*(m + i * columns + j) == Gettone2 && *(m + i * columns + j + 1) != Gettone2)){
+                orizzontale1 = 0;
+                orizzontale2 = 0;
+            }
         }
         if(orizzontale1 == 3 || orizzontale2 == 3)
             return 1;
@@ -377,11 +385,11 @@ void remove_msq(){
 *Matricola: VR471376
 *Nome e cognome: Riccardo Boron
 
-*Matricola: 
-*Nome e cognome: 
+*Matricola: VR479274
+*Nome e cognome: Mattia Riva
 
-*Matricola: 
-*Nome e cognome: 
+*Matricola: VR478582
+*Nome e cognome: Alessia Foglieni
 
 *Data di realizzazione: 18/05/2023
 *************************************/

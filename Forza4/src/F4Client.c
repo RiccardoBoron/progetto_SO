@@ -109,8 +109,6 @@ int main(int argc, char *argv[]) {
         errExit("msgget failed\n");
     }
 
-    //struct myMsg mossa;
-    //ssize_t siz = sizeof(struct myMsg) - sizeof(long);
     mossa.mtype = 1;
     mossa.posRiga = 0;
     mossa.posColonna = 0;
@@ -399,11 +397,11 @@ void quitCtrlClient(int sig){
 *Matricola: VR471376
 *Nome e cognome: Riccardo Boron
 
-*Matricola: 
-*Nome e cognome: 
+*Matricola: VR479274
+*Nome e cognome: Mattia Riva
 
-*Matricola: 
-*Nome e cognome: 
+*Matricola: VR478582
+*Nome e cognome: Alessia Foglieni
 
 *Data di realizzazione: 18/05/2023
 *************************************/
