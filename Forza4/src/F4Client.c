@@ -160,9 +160,14 @@ int main(int argc, char *argv[]) {
         errExit("change signal handler failed");
 
     //------------------------- GESTIONE DEL GIOCO -------------------------//
+
     int fine = 1; 
     while(fine == 1){
-        semOp(semid, 2, -1);
+        if(autoGameSignal == 1){
+            semOp(semid, 3, -1);
+        }else{
+            semOp(semid, 2, -1);
+        }
         //Se nessuno ha ancora vinto o pareggiato continuo
         if(shared->vincitore == 1){
             if(autoGameSignal != 1){
@@ -193,7 +198,8 @@ int main(int argc, char *argv[]) {
 
         //Giocatore automatico genera numeri random e manda la posizione dove inserire il gettone al server
         if(autoGameSignal == 1){
-            sleep(1);
+            mossa.aUtoGame = 0;
+            //sleep(1);
             srand(time(NULL));
             int rigaValida = 0;
             int maxNum = shared->colums;
@@ -210,8 +216,9 @@ int main(int argc, char *argv[]) {
             msgSnd(msqid, &mossa, siz, 0);
         }else{
             //Giocatore normale
+                mossa.aUtoGame = 1;
             do{
-                alarm(10); //Setto un timer di 30 secondi   
+                alarm(30); //Setto un timer di 30 secondi   
                 printf("\nGiocatore %s inserisci la colonna:  ", argv[1]);
                 fgets(buffer, sizeof(buffer), stdin);
                 alarm(0); //Disattivo il timer
@@ -249,11 +256,22 @@ int main(int argc, char *argv[]) {
         
         //Controllo se ce stata una vincita
         if(shared->vincitore == 1){
-            if(autoGameSignal != 1){
+            if(shared->autoGameFlag == 0){
                 printf("\nHai Vinto!!\n");
+            }
+
+            if(shared->autoGameFlag == 1 && shared->FlagVittoriaAutogame == 1){
+                if(autoGameSignal != 1)
+                    printf("\nHai Perso!!\n");
+                break;
+            }else if(shared->autoGameFlag == 1 && shared->FlagVittoriaAutogame == 2){
+                if(autoGameSignal != 1)
+                    printf("\nHai Vinto!!\n");
+                break;
             }
             fine = 0;
         }
+
         //Controllo se ce stato un pareggio
         if(shared->vincitore == 2){
             if(autoGameSignal != 1){
@@ -269,9 +287,6 @@ int main(int argc, char *argv[]) {
             }
             break;
         }
-
-        if(autoGameSignal == 1)
-            semOp(semid, 3, -1);
     }
     //Comunico al server che può terminare
     semOp(semid, 0, 1); 

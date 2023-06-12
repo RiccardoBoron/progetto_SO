@@ -134,6 +134,8 @@ int main(int argc, char *argv[]) {
     mossa.mtype = 1;
     mossa.posRiga = 0;
     mossa.posColonna = 0;
+    mossa.aUtoGame = 0;
+    
 
     //------------------------ GESTIONE DEI SEGNALI ------------------------//
     if(signal(SIGINT, sigHandler) == SIG_ERR)
@@ -196,6 +198,7 @@ int main(int argc, char *argv[]) {
     shared->Gettone1 = Gettone1;
     shared->Gettone2 = Gettone2;
     shared->vincitore = 0;
+    shared->FlagVittoriaAutogame = 0;
 
     //Inizializzazione della matrice (tutta vuota all'inizio)
     azzera(&matrix[0][0], rows, colums);
@@ -237,10 +240,31 @@ int main(int argc, char *argv[]) {
             }
         }
         //Avviso il client che puó stampare
-        semOp(semid, 1, 1);
-        semOp(semid, 2, 1);
-        if(autoGame == 1)
+        if(autoGame == 0){
+            semOp(semid, 1, 1);
+        }
+        
+        if(autoGame == 1 && mossa.aUtoGame == 0){
+            if(shared->vincitore == 1){
+                shared->FlagVittoriaAutogame = 1;
+                semOp(semid, 3, 1);
+            }
+            semOp(semid, 2, 1);
+        }
+
+        if(autoGame == 1 && mossa.aUtoGame == 1){
+            if(shared->vincitore == 1)
+                shared->FlagVittoriaAutogame = 2;
             semOp(semid, 3, 1);
+        }
+
+        if(autoGame == 1){
+            semOp(semid, 1, 1);
+        }
+
+        if(autoGame == 0){
+            semOp(semid, 2, 1);
+        }
     } 
     
     //Aspetto la terminazione dei client per eliminare semafori e shared memeory

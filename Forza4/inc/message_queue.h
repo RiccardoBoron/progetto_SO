@@ -6,6 +6,7 @@ struct myMsg {
     int mtype;
     int posRiga;
     int posColonna;
+    int aUtoGame;
     pid_t pidClient;
 };
 

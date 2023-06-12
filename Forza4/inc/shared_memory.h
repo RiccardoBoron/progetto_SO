@@ -16,6 +16,7 @@ struct Shared {
     int gettoneInizio;
     int vincitore;
     int autoGameFlag;
+    int FlagVittoriaAutogame;
     pid_t pidServer;
 };
 
