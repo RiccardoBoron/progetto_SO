@@ -28,6 +28,7 @@ void sigAlarm(int sig);
 void sigHandler(int sig);
 void quitCtrl();
 void quitCtrlClient(int sig);
+void terminalSignal(int sig);
 
 
 //------------------------- FUNZIONE PER LA CREAZIONE DI UN SET DI SEMAFORI -------------------------//
@@ -38,7 +39,7 @@ int create_sem_set(key_t semkey) {
         errExit("semget failed");
 
     //Inizializzazione del set di semafori
-    union semun arg;
+    union senum arg;
     unsigned short values[] = {0, 0, 1, 0};
     arg.array = values;
 
@@ -94,6 +95,7 @@ int main(int argc, char *argv[]) {
     sigdelset(&mySet, SIGINT);
     sigdelset(&mySet, SIGALRM);
     sigdelset(&mySet, SIGUSR1);
+    sigdelset(&mySet, SIGHUP);
     //blocco tutti gli altri segnali su mySet
     sigprocmask(SIG_SETMASK, &mySet, NULL);
 
@@ -159,6 +161,9 @@ int main(int argc, char *argv[]) {
     if(signal(SIGUSR1, quitCtrlClient) == SIG_ERR)
         errExit("change signal handler failed");
 
+    if(signal(SIGHUP, terminalSignal) == SIG_ERR)
+        errExit("change signal handler failed");
+
     //------------------------- GESTIONE DEL GIOCO -------------------------//
 
     int fine = 1; 
@@ -199,7 +204,6 @@ int main(int argc, char *argv[]) {
         //Giocatore automatico genera numeri random e manda la posizione dove inserire il gettone al server
         if(autoGameSignal == 1){
             mossa.aUtoGame = 0;
-            //sleep(1);
             srand(time(NULL));
             int rigaValida = 0;
             int maxNum = shared->colums;
@@ -374,6 +378,7 @@ void sigAlarm(int sig){
     semOp(semid, 0, 1);
     //Se termina il giocatore al quale non é concesso il turno sblocco il giocatore che sta inserendo e termina
     semOp(semid, 1, 1);
+    semOp(semid, 3, 1);
     //Detach shared memory
     free_shared_memory(shared);
     exit(0);
@@ -408,6 +413,11 @@ void quitCtrlClient(int sig){
     exit(0);
 }
 
+//Gestione del segnale di chiusura del terminale
+void terminalSignal(int sig){
+    quitCtrl();
+}
+
 /************************************** 
 *Matricola: VR471376
 *Nome e cognome: Riccardo Boron
@@ -418,5 +428,5 @@ void quitCtrlClient(int sig){
 *Matricola: VR478582
 *Nome e cognome: Alessia Foglieni
 
-*Data di realizzazione: 18/05/2023
+*Data di realizzazione: 25/06/2023
 *************************************/

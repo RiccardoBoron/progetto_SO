@@ -25,6 +25,7 @@ int controlloVittoria(char *m, int rows, int columns, char Gettone1, char Getton
 void sigHandler(int sig);
 void sigTimer(int sig);
 void quitCtrlClient(int sig);
+void terminalSignal(int sig);
 void remove_msq();
 
 //Variabili globali
@@ -46,7 +47,7 @@ int create_sem_set(key_t semkey) {
         errExit("semget failed");
 
     //Inizializzazione del set di semafori
-    union semun arg;
+    union senum arg;
     unsigned short values[] = {0, 0, 1, 0};
     arg.array = values;
 
@@ -72,6 +73,7 @@ int main(int argc, char *argv[]) {
     sigdelset(&mySet, SIGINT);
     sigdelset(&mySet, SIGALRM);
     sigdelset(&mySet, SIGUSR2);
+    sigdelset(&mySet, SIGHUP);
     //blocco tutti gli altri segnali su mySet
     sigprocmask(SIG_SETMASK, &mySet, NULL);
 
@@ -148,9 +150,12 @@ int main(int argc, char *argv[]) {
     if(signal(SIGUSR2, quitCtrlClient) == SIG_ERR)
         errExit("change signal handler failed");
 
+    if(signal(SIGHUP, terminalSignal) == SIG_ERR)
+        errExit("change signal handler failed");
+
     //------------------------- IL SERVER ASPETTA I CLIENT -------------------------//
 
-    printf("\n<Servre> Aspetto i client...\n");
+    printf("\n<Server> Aspetto i client...\n");
     semOp(semid, 0, -1); //Attesa primo client
     printf("\n<Server> Client 1 arrivato, attendo Client 2\n");
 
@@ -170,11 +175,8 @@ int main(int argc, char *argv[]) {
             char *args[] = {"giocatore", "1", NULL};
             //Faccio la exec()
             printf("\n<Server> Duplicazione server ed esecuzione client automatico...\n");
-            if(execv("./F4Client", args) == -1){
-                errExit("execv failed");
-            }
-            while(shared->vincitore == 0);
-            exit(0);
+            execv("./F4Client", args);
+            errExit("execv failed");
         }
     }
 
@@ -246,7 +248,7 @@ int main(int argc, char *argv[]) {
         
         if(autoGame == 1 && mossa.aUtoGame == 0){
             if(shared->vincitore == 1){
-                shared->FlagVittoriaAutogame = 1;
+                shared->FlagVittoriaAutogame = 1; //Vince Autogame
                 semOp(semid, 3, 1);
             }
             semOp(semid, 2, 1);
@@ -254,7 +256,7 @@ int main(int argc, char *argv[]) {
 
         if(autoGame == 1 && mossa.aUtoGame == 1){
             if(shared->vincitore == 1)
-                shared->FlagVittoriaAutogame = 2;
+                shared->FlagVittoriaAutogame = 2; //Vince Client Normale
             semOp(semid, 3, 1);
         }
 
@@ -274,9 +276,7 @@ int main(int argc, char *argv[]) {
     semOp(semid, 0, -1);
     printf("<Server> Client 2 terminato, FINE GIOCO\n");
 
-    //Aspetto che termini il figlio 
-    while(wait(NULL) != -1);
-
+    
     //------------------------- ELIMINAZIONE SEMAFORI, SHARED MEMORY, MESSAGE QUEUE -------------------------//
     remove_msq();
 
@@ -385,6 +385,21 @@ void quitCtrlClient(int sig){
     exit(0);
 }
 
+//Gestione del segnale di chiusura del terminale
+void terminalSignal(int sig){
+     shared->vincitore = -1;
+    if(kill(pidClient1, SIGINT) == -1){
+        errExit("kill failed");
+    }
+
+    if(kill(pidClient2, SIGINT)){
+        errExit("kill failed");
+    }
+
+    remove_msq();
+    exit(0);
+}
+
 //FUNZIONE DI ELIMINAZIONE SEMAFORI, SHARED MEMORY, MESSAGE QUEUE 
 void remove_msq(){
     if(semctl(semid, 0, IPC_RMID, NULL) == -1)
@@ -415,6 +430,6 @@ void remove_msq(){
 *Matricola: VR478582
 *Nome e cognome: Alessia Foglieni
 
-*Data di realizzazione: 18/05/2023
+*Data di realizzazione: 25/06/2023
 *************************************/
 
