@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
     sigset_t mySet;
     //Iniziallizzazio di mySet con tutti i segnali
     sigfillset(&mySet);
-    //Rimozione del segnale SIGINT, SIGALARM, SIGUSR2 da mySet
+    //Rimozione del segnale SIGINT, SIGALARM, SIGUSR2, SIGHUP da mySet
     sigdelset(&mySet, SIGINT);
     sigdelset(&mySet, SIGALRM);
     sigdelset(&mySet, SIGUSR2);
@@ -107,6 +107,15 @@ int main(int argc, char *argv[]) {
     //Memoria condivisa dove salvo la dimensione delle righe e delle colonne e una variabile per determinare il vincitore
     shmid = alloc_shared_memory(shmKey, sizeof(struct Shared));
     shared = (struct Shared*)get_shared_memory(shmid, 0);
+
+    //Acquisiszione pid del server
+    shared->pidServer = getpid();
+
+    //Controllo il numero di server, solo un server puó essere attivo
+    shared ->nServer ++;
+    if(shared->nServer > 1){
+        errExit("\nEsiste giá un server attivo...\n");
+    }
 
     //Memoria condivisa che viene utilizzata come una matrice
     shmId = shmget(shmKey2, rows * colums * sizeof(int), IPC_CREAT | S_IRUSR | S_IWUSR);
@@ -188,8 +197,6 @@ int main(int argc, char *argv[]) {
     msgRcv(msqid, &mossa, siz, 0, 0);
     pidClient2 = mossa.pidClient;
     
-    //Acquisiszione pid del server
-    shared->pidServer = getpid();
 
     //------------------------- INIZIALIZZAZIONE CAMPO DI GIOCO -------------------------//
     printf("\n<Server> Preparo il campo di gioco...\n");
@@ -335,6 +342,30 @@ int controlloVittoria(char *m,int rows, int columns, char Gettone1, char Gettone
             return 1;
         orizzontale1 = 0;
         orizzontale2 = 0;
+    }
+
+    //Controllo diagonali principali
+    for (int i = 0; i < rows - 3; i++) {
+        for (int j = 0; j < columns - 3; j++) {
+            if (*(m + i * columns + j) == Gettone1 && *(m + (i + 1) * columns + j + 1) == Gettone1 && *(m + (i + 2) * columns + j + 2) == Gettone1 && *(m + (i + 3) * columns + j + 3) == Gettone1) {
+                return 1;
+            }
+            if (*(m + i * columns + j) == Gettone2 && *(m + (i + 1) * columns + j + 1) == Gettone2 && *(m + (i + 2) * columns + j + 2) == Gettone2 && *(m + (i + 3) * columns + j + 3) == Gettone2) {
+                return 1;
+            }
+        }
+    }
+
+    //Controllo diagonali secondarie
+    for (int i = 0; i < rows - 3; i++) {
+        for (int j = columns - 1; j >= 3; j--) {
+            if (*(m + i * columns + j) == Gettone1 && *(m + (i + 1) * columns + j - 1) == Gettone1 && *(m + (i + 2) * columns + j - 2) == Gettone1 && *(m + (i + 3) * columns + j - 3) == Gettone1) {
+                return 1;
+            }
+            if (*(m + i * columns + j) == Gettone2 && *(m + (i + 1) * columns + j - 1) == Gettone2 && *(m + (i + 2) * columns + j - 2) == Gettone2 && *(m + (i + 3) * columns + j - 3) == Gettone2) {
+                return 1;
+            }
+        }
     }
 
     return 0;

@@ -18,6 +18,8 @@ struct Shared {
     int autoGameFlag;
     int FlagVittoriaAutogame;
     pid_t pidServer;
+    int nServer;
+    int nClient;
 };
 
 int alloc_shared_memory(key_t shmKey, size_t size);

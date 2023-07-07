@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
     sigset_t mySet;
     //Iniziallizzazio di mySet con tutti i segnali
     sigfillset(&mySet);
-    //Rimozione del segnale SIGINT, SIGALARM, SIGUSR1 da mySet
+    //Rimozione del segnale SIGINT, SIGALARM, SIGUSR1, SIGHUP da mySet
     sigdelset(&mySet, SIGINT);
     sigdelset(&mySet, SIGALRM);
     sigdelset(&mySet, SIGUSR1);
@@ -120,6 +120,34 @@ int main(int argc, char *argv[]) {
     //Memoria condivisa dove salvo la dimensione delle righe e delle colonne e una variabile per determinare il vincitore
     int shmid = alloc_shared_memory(shmKey, sizeof(struct Shared));
     shared = (struct Shared *)get_shared_memory(shmid, 0);
+
+    //Verifico se si collegano piú di due client, solo due client possono eseguire nel caso un terzo esegua termino per errore di gioco
+    shared->nClient ++;
+    if(shared->nClient > 2){
+        kill(shared->pidServer, SIGHUP);
+        errExit("\nERRORE DI GIOCO: non é possibile giocare in 3 !!!\n");
+    }
+
+    //Verifico se un client viene eseguito prima del server, in caso positivo genera un errrore di gioco
+    if(shared->pidServer == 0){
+        //Rimuovo le ipc create
+
+        //Semafori
+        if(semctl(semid, 0, IPC_RMID, NULL) == -1)
+            errExit("smctl failed\n");
+        
+        //Memoria condivisa
+        free_shared_memory(shared);
+
+        remove_shared_memory(shmid);
+
+        //Coda dei messaggi
+        if(msgctl(msqid, IPC_RMID, NULL) == -1)
+            errExit("msgctl IPC_RMID failed");
+
+        errExit("ERRORE DI GIOCO: Server non attivo");
+    }
+
 
     //Memoria condivisa che viene utilizzata come una matrice
     int shmId = shmget(shmKey2, shared->rows * shared->colums * sizeof(char),  IPC_CREAT | S_IRUSR | S_IWUSR);
