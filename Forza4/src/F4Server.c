@@ -451,16 +451,3 @@ void remove_msq(){
 }
 
 
-/************************************** 
-*Matricola: VR471376
-*Nome e cognome: Riccardo Boron
-
-*Matricola: VR479274
-*Nome e cognome: Mattia Riva
-
-*Matricola: VR478582
-*Nome e cognome: Alessia Foglieni
-
-*Data di realizzazione: 25/06/2023
-*************************************/
-
